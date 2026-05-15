@@ -1,2 +1,722 @@
 <!DOCTYPE html>
-<html><head><meta http-equiv="refresh" content="0;url=./MoldovanPower.html"></head><body></body></html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0B0F19">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Moldovan Power</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        :root { --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px); }
+        * { -webkit-tap-highlight-color: transparent; }
+        html, body { background:#0B0F19; }
+        body { overscroll-behavior-y: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; margin: 0; }
+        input, select, textarea { font-size: 16px !important; color-scheme: dark; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .tap { transition: transform .12s ease, opacity .12s ease; }
+        .tap:active { transform: scale(.96); }
+        .fade-in { animation: fade .25s ease both; }
+        @keyframes fade { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+        input[type=range] { -webkit-appearance:none; appearance:none; height:8px; border-radius:99px; background:#1E293B; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px; border-radius:50%; background:#fff; border:4px solid var(--thumb,#3B82F6); }
+        ::placeholder { color:#475569; }
+        select option { background:#0F172A; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="react">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        /* ---------- AUDIO ---------- */
+        let actx = null;
+        const resumeAudio = () => { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {} };
+        const beep = (freq = 880, ms = 130) => {
+            try { if (!actx) return;
+                const o = actx.createOscillator(), g = actx.createGain();
+                o.connect(g); g.connect(actx.destination); o.type = 'sine'; o.frequency.value = freq;
+                const t = actx.currentTime;
+                g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+                o.start(t); o.stop(t + ms / 1000);
+            } catch (e) {}
+        };
+
+        /* ---------- ICONOS ---------- */
+        const Ic = ({ d, s = 22, c }) => (
+            <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={c ? { color: c } : null}>{d}</svg>
+        );
+        const I = {
+            today:<><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></>,
+            scale:<><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8.5 10a3.5 3.5 0 0 1 7 0"/><path d="M12 4v2"/></>,
+            chart:<><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></>,
+            diary:<><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>,
+            cog:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></>,
+            trash:<><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></>,
+            plus:<><path d="M12 5v14M5 12h14"/></>,
+            save:<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></>,
+            up:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></>,
+            sheet:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></>,
+            play:<><circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4z"/></>,
+            pause:<><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></>,
+            reload:<><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></>,
+            check:<><path d="M20 6 9 17l-5-5"/></>,
+            chev:<><path d="M9 18l6-6-6-6"/></>,
+            heart:<><path d="M19 14c1.5-1.5 3-3.2 3-5.5A4.5 4.5 0 0 0 12 6 4.5 4.5 0 0 0 2 8.5C2 13 12 21 12 21z"/></>,
+            flame:<><path d="M12 2c1 4-2 5-2 8a3 3 0 0 0 6 0c0-1-.5-2-1-2.5C16 10 19 13 19 16a7 7 0 0 1-14 0c0-5 5-7 7-14z"/></>,
+            bell:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></>,
+            arrow:<><path d="M5 12h14M13 6l6 6-6 6"/></>,
+        };
+
+        /* ---------- CONFIG ---------- */
+        const ORDER = ['pull', 'legs', 'mobility', 'push', 'core', 'light', 'rest'];
+        const DAYS = {
+            pull:     { label: 'Tracción',         short: 'Trac', sub: 'Tren superior · tracción + escápula', accent: '#10B981' },
+            legs:     { label: 'Cadena posterior', short: 'C.Post', sub: 'Unilateral · glúteo e isquios',     accent: '#3B82F6' },
+            mobility: { label: 'Movilidad / Pies', short: 'Movil', sub: 'Pies, columna y movilidad',          accent: '#F59E0B' },
+            push:     { label: 'Empuje',           short: 'Push', sub: 'Dips',                                 accent: '#F43F5E' },
+            core:     { label: 'Core',             short: 'Core', sub: 'Isometrías por tiempo',               accent: '#8B5CF6' },
+            light:    { label: 'Ligero',           short: 'Light', sub: 'Actividad ligera',                   accent: '#14B8A6' },
+            rest:     { label: 'Descanso',         short: 'Rest', sub: 'Recuperación',                        accent: '#64748B' },
+        };
+
+        const TEMPLATES = {
+            pull: [
+                { name: 'Dominadas lastradas', kind: 'weighted',
+                  note: 'S1 6-10 al fallo técnico · S2 −20% 10-15. Descanso 5-7 min. Sube carga al llegar a 10 (S1) / 15 (S2).', sets: [] },
+                { name: 'Control escapular (scap pull-ups)', kind: 'reps', note: 'Submáximo, control. (Uri)', sets: [{ w: '', r: '' }] },
+            ],
+            legs: [
+                { name: 'Sentadilla búlgara rotacional', kind: 'weighted', video: 'https://youtu.be/sOziRhBSdro', note: 'Unilateral — registra Izq y Der. Peso 0 si va sin carga.', sets: [{ label: 'Izq', w: '', r: '' }, { label: 'Der', w: '', r: '' }] },
+                { name: 'Peso muerto unilateral', kind: 'weighted', video: 'https://youtu.be/esNrC-CVoG8', note: 'Unilateral — registra Izq y Der.', sets: [{ label: 'Izq', w: '', r: '' }, { label: 'Der', w: '', r: '' }] },
+                { name: 'Hip Thrust a una pierna', kind: 'weighted', video: 'https://youtu.be/z3tNiBXOW-4', note: 'Unilateral — registra Izq y Der.', sets: [{ label: 'Izq', w: '', r: '' }, { label: 'Der', w: '', r: '' }] },
+                { name: 'Peso muerto unilateral + Triple flexión', kind: 'weighted', video: 'https://youtu.be/723znr5C6b8', note: 'Unilateral — registra Izq y Der.', sets: [{ label: 'Izq', w: '', r: '' }, { label: 'Der', w: '', r: '' }] },
+            ],
+            mobility: [
+                { name: 'Rutina de pies', kind: 'checklist', video: 'https://youtu.be/6aYPQFA5C-o', done: false },
+                { name: 'Movilidad muñeca + escápula', kind: 'checklist', done: false },
+                { name: 'Cat Cow', kind: 'reps', note: '4 series.', sets: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }] },
+                { name: 'Bird dog', kind: 'reps', note: '4 series.', sets: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }] },
+            ],
+            push: [
+                { name: 'Dips (sin lastre)', kind: 'weighted', note: 'Objetivo: series de 20. Progresa añadiendo serie o reps. El peso queda en 0 hasta que subas.', sets: [{ w: '', r: '' }] },
+            ],
+            core: [
+                { name: 'Plancha (codos)', kind: 'timer', note: 'Edita los minutos por serie. Pitido los últimos 3 s.', sets: [{ sec: 120, done: false }] },
+                { name: 'Dead bug', kind: 'timer', note: 'Por tiempo.', sets: [{ sec: 45, done: false }] },
+                { name: 'Anti-rotación (pallof)', kind: 'timer', halfBeep: true, note: 'Suena a la mitad: cambia de lado.', sets: [{ sec: 90, done: false }] },
+            ],
+            light: [{ name: 'Cardio', kind: 'cardio', cardio: { method: 'walk', km: '', time: '', ppm: '', rounds: '' } }],
+            rest: [],
+        };
+        const SUGGEST = { push: [{ name: 'Flexiones a puños', kind: 'reps', note: 'Vuelta si molesta la muñeca.' }] };
+
+        const todayStr = () => new Date().toISOString().split('T')[0];
+        const dstr = (d) => d.toISOString().split('T')[0];
+        const r05 = (v) => Math.round(v * 2) / 2;
+        const STRAT = (rm) => { const m = Number(rm) || 0; return { cal1: r05(m * 0.40), cal2: r05(m * 0.60), s1: r05(m * 0.75), s2: r05(m * 0.75 * 0.80) }; };
+        const seed = (t, rm) => {
+            const ex = JSON.parse(JSON.stringify(TEMPLATES[t] || []));
+            if (t === 'pull') {
+                const s = STRAT(rm);
+                const d = ex.find(e => e.name === 'Dominadas lastradas');
+                if (d) d.sets = [
+                    { label: 'Cal. 0', w: '0', r: '5' },
+                    { label: 'Cal. 1', w: String(s.cal1), r: '' },
+                    { label: 'Cal. 2', w: String(s.cal2), r: '' },
+                    { label: 'Serie 1', w: String(s.s1), r: '' },
+                    { label: 'Serie 2', w: String(s.s2), r: '' },
+                ];
+            }
+            return ex;
+        };
+        const CARDIO_METHODS = { walk: 'Caminar', elliptical: 'Elíptica', bike: 'Bici', hiit: 'HIIT' };
+
+        /* ---------- MIGRACIÓN ---------- */
+        const normEntry = (e) => {
+            if (!e) return null;
+            const map = { push: 'push', pull: 'pull', legs: 'legs', rest: 'rest' };
+            const dayType = e.dayType || map[e.type] || 'pull';
+            let pain = e.pain;
+            if (typeof pain === 'number' || typeof pain === 'string') pain = { wrist: Number(pain) || 0, knee: 0 };
+            if (!pain) pain = { wrist: 0, knee: 0 };
+            let exercises = e.exercises;
+            if (!exercises && Array.isArray(e.exs)) exercises = e.exs.map(x => ({ name: x.n || 'Ejercicio', kind: 'weighted', sets: (x.s || []).map(s => ({ w: s.w ?? '', r: s.r ?? '' })) }));
+            return { id: e.id || Date.now() + Math.random(), date: e.date || todayStr(), dayType, bw: e.bw ?? '', pain: { wrist: Number(pain.wrist) || 0, knee: Number(pain.knee) || 0 }, notes: e.notes || '', exercises: Array.isArray(exercises) ? exercises : [] };
+        };
+        const profileFrom = (p = {}) => ({ bw: p.bw ?? 85, oneRM: p.oneRM ?? p.pullRef ?? p.pull ?? 40 });
+        const loadProfile = () => profileFrom(JSON.parse(localStorage.getItem('mp2_prof') || localStorage.getItem('mp_prof') || '{}'));
+        const loadHistory = () => { const raw = localStorage.getItem('mp2_hist') || localStorage.getItem('mp_hist'); if (!raw) return []; try { return (JSON.parse(raw) || []).map(normEntry).filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date)); } catch { return []; } };
+        const loadWeight = () => { try { return (JSON.parse(localStorage.getItem('mp2_weight') || '[]') || []).filter(x => x && x.date).sort((a, b) => new Date(b.date) - new Date(a.date)); } catch { return []; } };
+
+        const METRICS = {
+            weight: { label: 'Peso corporal', unit: ' kg', src: 'weight' },
+            fat:    { label: '% Grasa (báscula)', unit: ' %', src: 'fat' },
+            pull:   { label: 'Dominadas (kg lastre)', unit: ' kg', src: 'maxW', ex: 'Dominadas lastradas' },
+            dips:   { label: 'Dips (reps totales)', unit: ' reps', src: 'sumR', ex: 'Dips (sin lastre)' },
+            plank:  { label: 'Plancha (tiempo)', unit: '', src: 'maxSec', ex: 'Plancha (codos)' },
+        };
+
+        /* ---------- UI BASE ---------- */
+        const Card = ({ children, className = '' }) => (<div className={`bg-[#121826] border border-white/[0.06] rounded-3xl ${className}`}>{children}</div>);
+        const PainSlider = ({ label, value, onChange }) => {
+            const col = value >= 4 ? '#F43F5E' : value >= 2 ? '#F59E0B' : '#10B981';
+            return (<div className="space-y-2">
+                <div className="flex justify-between items-center"><span className="text-xs font-semibold text-slate-400">{label}</span><span className="text-sm font-extrabold" style={{ color: col }}>{value}/10</span></div>
+                <input type="range" min="0" max="10" value={value} onChange={e => onChange(Number(e.target.value))} className="w-full" style={{ '--thumb': col }} />
+            </div>);
+        };
+        const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`;
+
+        const MiniChart = ({ pts, unit, accent, secMode }) => {
+            if (pts.length < 2) return <div className="h-32 flex items-center justify-center text-[11px] font-bold uppercase tracking-widest text-slate-600">Necesitas 2+ registros</div>;
+            const vals = pts.map(p => p.v), mn = Math.min(...vals), mx = Math.max(...vals);
+            const pad = (mx - mn) * 0.18 || 1, lo = mn - pad, hi = mx + pad, rg = hi - lo;
+            const pl = pts.map((p, k) => `${(k / (pts.length - 1)) * 100},${100 - ((p.v - lo) / rg) * 100}`).join(' ');
+            const fv = (v) => secMode ? fmt(v) : v;
+            const first = pts[0].v, last = pts.at(-1).v, delta = (last - first).toFixed(1);
+            return (<>
+                <div className="flex justify-between items-end mb-3">
+                    <div className="text-2xl font-black">{fv(last)}<span className="text-sm text-slate-500">{secMode ? '' : unit}</span></div>
+                    <div className="text-[11px] font-bold" style={{ color: delta >= 0 ? '#10B981' : '#F43F5E' }}>{delta >= 0 ? '▲ +' : '▼ '}{delta}{unit} · {pts.length}</div>
+                </div>
+                <div className="h-28"><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+                    <polyline points={pl} fill="none" stroke={accent} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                    {pts.map((p, k) => <circle key={k} cx={(k / (pts.length - 1)) * 100} cy={100 - ((p.v - lo) / rg) * 100} r="3.5" fill="#0B0F19" stroke={accent} strokeWidth="2" vectorEffect="non-scaling-stroke" />)}
+                </svg></div>
+            </>);
+        };
+
+        const TimerSet = ({ st, halfBeep, accent, onChange, onDel, canDel }) => {
+            const dur = Number(st.sec) || 0;
+            const [rem, setRem] = useState(dur);
+            const [run, setRun] = useState(false);
+            const iv = useRef(null);
+            useEffect(() => { if (!run) setRem(dur); }, [dur]);
+            useEffect(() => () => clearInterval(iv.current), []);
+            const stop = () => { clearInterval(iv.current); setRun(false); };
+            const start = () => {
+                resumeAudio(); let cur = rem <= 0 ? dur : rem; setRem(cur); setRun(true); clearInterval(iv.current);
+                iv.current = setInterval(() => {
+                    cur -= 1;
+                    if (halfBeep && cur === Math.floor(dur / 2) && cur > 0) beep(1250, 280);
+                    if (cur <= 3 && cur > 0) beep(760, 130);
+                    if (cur <= 0) { beep(1020, 540); clearInterval(iv.current); setRun(false); setRem(0); onChange({ ...st, done: true }); return; }
+                    setRem(cur);
+                }, 1000);
+            };
+            const mins = Math.floor(dur / 60), secs = dur % 60;
+            return (<div className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06]">
+                <div className="flex items-center justify-between">
+                    {run ? <div className="text-3xl font-black tabular-nums" style={{ color: accent }}>{fmt(rem)}</div> : (
+                        <div className="flex items-center gap-1">
+                            <input type="number" inputMode="numeric" value={mins} onChange={e => onChange({ ...st, sec: Math.max(0, (Number(e.target.value) || 0) * 60 + secs) })} className="bg-[#121826] w-14 text-center rounded-lg p-2 font-black outline-none" />
+                            <span className="font-black text-slate-500">:</span>
+                            <input type="number" inputMode="numeric" value={secs} onChange={e => onChange({ ...st, sec: Math.max(0, mins * 60 + Math.min(59, Number(e.target.value) || 0)) })} className="bg-[#121826] w-14 text-center rounded-lg p-2 font-black outline-none" />
+                            <span className="text-[10px] text-slate-500 font-bold ml-1">min : seg</span>
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                        {st.done && !run && <span className="text-xs font-bold" style={{ color: accent }}>✓</span>}
+                        <button onClick={run ? stop : start} className="tap p-2 rounded-full" style={{ background: accent, color: '#fff' }}><Ic d={run ? I.pause : I.play} s={18} /></button>
+                        <button onClick={() => { stop(); setRem(dur); onChange({ ...st, done: false }); }} className="tap text-slate-500 p-1"><Ic d={I.reload} s={16} /></button>
+                        {canDel && <button onClick={onDel} className="tap text-slate-700 p-1"><Ic d={I.trash} s={15} /></button>}
+                    </div>
+                </div>
+            </div>);
+        };
+
+        const CardioBlock = ({ ex, accent, onChange }) => {
+            const c = ex.cardio || { method: 'walk' };
+            const set = (k, v) => onChange({ ...ex, cardio: { ...c, [k]: v } });
+            const F = ({ k, label }) => (<div className="bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06] flex-1"><label className="text-[9px] block text-slate-500 font-bold uppercase">{label}</label><input type="number" inputMode="decimal" placeholder="0" value={c[k] || ''} onChange={e => set(k, e.target.value)} className="bg-transparent w-full font-black outline-none" /></div>);
+            return (<div className="p-4 space-y-3">
+                <div className="grid grid-cols-4 gap-1.5">{Object.keys(CARDIO_METHODS).map(m => <button key={m} onClick={() => set('method', m)} className="py-2 rounded-lg text-[11px] font-bold tap border" style={c.method === m ? { background: accent, borderColor: accent, color: '#fff' } : { borderColor: '#ffffff14', color: '#64748b' }}>{CARDIO_METHODS[m]}</button>)}</div>
+                {c.method === 'hiit' ? (<><p className="text-[11px] text-slate-400 bg-white/[0.03] rounded-xl p-2.5">20 s a tope / 90 s relax.</p><div className="flex gap-2"><F k="rounds" label="Rondas" /><F k="ppm" label="Pulsaciones med." /></div></>)
+                : c.method === 'elliptical' ? <div className="flex gap-2"><F k="time" label="Tiempo (min)" /><F k="ppm" label="Pulsaciones med." /></div>
+                : <div className="flex gap-2"><F k="km" label="Km" /><F k="time" label="Tiempo (min)" /><F k="ppm" label="Puls. med." /></div>}
+            </div>);
+        };
+
+        /* ---------- APP ---------- */
+        const App = () => {
+            const [profile, setProfile] = useState(loadProfile);
+            const [history, setHistory] = useState(loadHistory);
+            const [weightLog, setWeightLog] = useState(loadWeight);
+            const [tab, setTab] = useState('today');
+            const [date, setDate] = useState(todayStr());
+            const [session, setSession] = useState({ dayType: null, pain: { wrist: 0, knee: 0 }, notes: '', exercises: [] });
+            const [toast, setToast] = useState('');
+            const [expanded, setExpanded] = useState(null);
+            const [adding, setAdding] = useState(false);
+            const [newEx, setNewEx] = useState({ name: '', kind: 'weighted' });
+            const [cardioOpen, setCardioOpen] = useState(false);
+            const [charts, setCharts] = useState(() => { try { return JSON.parse(localStorage.getItem('mp2_charts')) || ['weight', 'fat', 'pull']; } catch { return ['weight', 'fat', 'pull']; } });
+            const [range, setRange] = useState(90);
+            const [wForm, setWForm] = useState({ date: todayStr(), w: '', fat: '' });
+            const [diaryView, setDiaryView] = useState('week');
+            const [weekOff, setWeekOff] = useState(0);
+            const [monOff, setMonOff] = useState(0);
+            const [notif, setNotif] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+            const fileRef = useRef(null);
+
+            useEffect(() => localStorage.setItem('mp2_prof', JSON.stringify(profile)), [profile]);
+            useEffect(() => localStorage.setItem('mp2_hist', JSON.stringify(history)), [history]);
+            useEffect(() => localStorage.setItem('mp2_weight', JSON.stringify(weightLog)), [weightLog]);
+            useEffect(() => localStorage.setItem('mp2_charts', JSON.stringify(charts)), [charts]);
+            const ping = (m) => { setToast(m); setTimeout(() => setToast(''), 2400); };
+
+            const activeDates = useMemo(() => new Set([...history.map(h => h.date), ...weightLog.map(w => w.date)]), [history, weightLog]);
+            const streak = useMemo(() => {
+                let s = 0; const d = new Date();
+                if (!activeDates.has(todayStr())) d.setDate(d.getDate() - 1);
+                while (activeDates.has(dstr(d))) { s++; d.setDate(d.getDate() - 1); }
+                return s;
+            }, [activeDates]);
+
+            // Recordatorio 19:30 (mejor esfuerzo: requiere app/pestaña abierta o instalada activa)
+            useEffect(() => {
+                const check = () => {
+                    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+                    const now = new Date(); const t = now.getHours() * 60 + now.getMinutes();
+                    const tdy = todayStr();
+                    if (t >= 19 * 60 + 30 && !activeDates.has(tdy) && localStorage.getItem('mp2_notified') !== tdy) {
+                        localStorage.setItem('mp2_notified', tdy);
+                        try { new Notification('Moldovan Power', { body: `No has entrenado hoy 💪 Entrena o perderás tu racha de ${streak} días.` }); } catch (e) {}
+                    }
+                };
+                const id = setInterval(check, 60000); check();
+                document.addEventListener('visibilitychange', check);
+                return () => { clearInterval(id); document.removeEventListener('visibilitychange', check); };
+            }, [activeDates, streak]);
+
+            const suggestType = useMemo(() => { if (!history.length) return ORDER[0]; const i = ORDER.indexOf(history[0].dayType); return ORDER[(i + 1) % ORDER.length]; }, [history]);
+            const dayType = session.dayType || suggestType;
+            const theme = DAYS[dayType] || DAYS.rest;
+
+            useEffect(() => {
+                const saved = history.find(h => h.date === date);
+                if (saved) setSession({ dayType: saved.dayType, pain: { ...saved.pain }, notes: saved.notes, exercises: JSON.parse(JSON.stringify(saved.exercises)) });
+                else setSession({ dayType: suggestType, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(suggestType, profile.oneRM) });
+            }, [date]);
+
+            const changeDay = (t) => setSession(s => ({ ...s, dayType: t, exercises: seed(t, profile.oneRM) }));
+            const lastPerf = (name) => {
+                const h = history.filter(x => x.date !== date).find(x => (x.exercises || []).some(e => e.name === name));
+                if (!h) return null;
+                const ex = h.exercises.find(e => e.name === name); if (!ex) return null;
+                if (ex.kind === 'checklist') return ex.done ? `Última vez: hecho · ${h.date}` : null;
+                if (ex.kind === 'timer') { const t = (ex.sets || []).map(s => fmt(Number(s.sec) || 0)).join(' · '); return t ? `Última vez: ${t} · ${h.date}` : null; }
+                if (ex.kind === 'cardio') { const c = ex.cardio || {}; return `Última vez: ${CARDIO_METHODS[c.method] || ''} ${c.km ? c.km + 'km ' : ''}${c.time ? c.time + 'min' : ''} · ${h.date}`; }
+                const parts = (ex.sets || []).filter(s => s.w || s.r).map(s => `${s.w ? '+' + s.w + 'kg ' : ''}${s.r || 0}r`);
+                return parts.length ? `Última vez: ${parts.join(' · ')}` : null;
+            };
+            const strat = useMemo(() => STRAT(profile.oneRM), [profile.oneRM]);
+
+            const save = () => {
+                const entry = { id: Date.now(), date, dayType, bw: profile.bw, pain: { ...session.pain }, notes: session.notes, exercises: JSON.parse(JSON.stringify(session.exercises)) };
+                setHistory(h => [entry, ...h.filter(x => x.date !== date)].sort((a, b) => new Date(b.date) - new Date(a.date)));
+                ping('Sesión guardada');
+            };
+            const delEntry = (id) => { if (confirm('¿Borrar esta sesión?')) setHistory(h => h.filter(x => x.id !== id)); };
+            const updEx = (i, fn) => setSession(s => ({ ...s, exercises: s.exercises.map((e, k) => k === i ? fn(JSON.parse(JSON.stringify(e))) : e) }));
+            const delExAt = (i) => setSession(s => ({ ...s, exercises: s.exercises.filter((_, k) => k !== i) }));
+            const pushEx = (b) => setSession(s => ({ ...s, exercises: [...s.exercises, JSON.parse(JSON.stringify(b))] }));
+            const addEx = () => {
+                if (!newEx.name.trim()) return;
+                const b = { name: newEx.name.trim(), kind: newEx.kind };
+                if (newEx.kind === 'checklist') b.done = false;
+                else if (newEx.kind === 'timer') b.sets = [{ sec: 60, done: false }];
+                else if (newEx.kind === 'cardio') b.cardio = { method: 'walk', km: '', time: '', ppm: '', rounds: '' };
+                else b.sets = [{ w: '', r: '' }];
+                pushEx(b); setNewEx({ name: '', kind: 'weighted' }); setAdding(false);
+            };
+            const addCardio = (m) => { pushEx({ name: 'Cardio', kind: 'cardio', cardio: { method: m, km: '', time: '', ppm: '', rounds: '' } }); setCardioOpen(false); };
+
+            const saveWeight = () => {
+                if (!wForm.w) { ping('Pon al menos el peso'); return; }
+                const e = { date: wForm.date, w: wForm.w, fat: wForm.fat };
+                setWeightLog(l => [e, ...l.filter(x => x.date !== wForm.date)].sort((a, b) => new Date(b.date) - new Date(a.date)));
+                setWForm({ date: todayStr(), w: '', fat: '' }); ping('Peso registrado');
+            };
+            const delWeight = (d) => setWeightLog(l => l.filter(x => x.date !== d));
+
+            const reqNotif = () => { if (typeof Notification === 'undefined') { ping('Notificaciones no soportadas'); return; } Notification.requestPermission().then(p => { setNotif(p); if (p === 'granted') ping('Recordatorio activado'); }); };
+
+            /* ---- backups ---- */
+            const exportBackup = () => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([JSON.stringify({ profile, history, weightLog, version: 'MP3' }, null, 2)], { type: 'application/json' }));
+                a.download = `MoldovanPower_backup_${todayStr()}.json`; a.click();
+            };
+            const importBackup = (e) => {
+                const f = e.target.files[0]; if (!f) return; const rd = new FileReader();
+                rd.onload = (ev) => {
+                    try {
+                        const d = JSON.parse(ev.target.result);
+                        if (d.history || d.weightLog) {
+                            const hist = (d.history || []).map(normEntry).filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date));
+                            const wl = (d.weightLog || []).filter(x => x && x.date).sort((a, b) => new Date(b.date) - new Date(a.date));
+                            if (confirm(`¿Restaurar ${hist.length} sesiones y ${wl.length} pesos? Reemplaza los datos actuales.`)) {
+                                if (d.profile) setProfile(profileFrom(d.profile));
+                                setHistory(hist); setWeightLog(wl); ping('Datos restaurados');
+                            }
+                        } else ping('Archivo no válido');
+                    } catch { ping('Error al leer el archivo'); }
+                };
+                rd.readAsText(f); e.target.value = null;
+            };
+            const exportReport = () => {
+                const lim = range === 9999 ? new Date(0) : new Date(Date.now() - range * 86400000);
+                const data = history.filter(h => new Date(h.date) >= lim).sort((a, b) => new Date(b.date) - new Date(a.date));
+                const wl = weightLog.filter(w => new Date(w.date) >= lim);
+                const css = `font-family:Arial,Helvetica,sans-serif;`;
+                let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head>
+                <body style="${css}background:#0B0F19;padding:24px;color:#E2E8F0;">
+                <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">MOLDOVAN·POWER</div>
+                <div style="font-size:11px;color:#64748B;margin-bottom:18px;">Informe · ${todayStr()} · Racha actual ${streak} días</div>
+                <table style="${css}border-collapse:collapse;width:100%;font-size:12px;">
+                <tr style="background:#10B981;color:#fff;text-align:left;"><th style="padding:8px 10px;">Fecha</th><th style="padding:8px 10px;">Día</th><th style="padding:8px 10px;">P.Corp</th><th style="padding:8px 10px;">Ejercicio</th><th style="padding:8px 10px;">Serie</th><th style="padding:8px 10px;">Kg</th><th style="padding:8px 10px;">Dato</th><th style="padding:8px 10px;">Muñeca</th><th style="padding:8px 10px;">Rodilla</th><th style="padding:8px 10px;">Notas</th></tr>`;
+                let alt = false;
+                data.forEach(h => {
+                    const dd = DAYS[h.dayType] || DAYS.rest; const bg = (alt = !alt) ? '#121826' : '#0F1521';
+                    const base = `<td style="padding:7px 10px;color:#94A3B8;">${h.date}</td><td style="padding:7px 10px;color:${dd.accent};font-weight:700;">${dd.label}</td><td style="padding:7px 10px;">${h.bw}</td>`;
+                    const tail = `<td style="padding:7px 10px;">${h.pain.wrist}</td><td style="padding:7px 10px;">${h.pain.knee}</td><td style="padding:7px 10px;color:#64748B;">${h.notes || ''}</td>`;
+                    const row = (mid) => { html += `<tr style="background:${bg};">${base}${mid}${tail}</tr>`; };
+                    if (!h.exercises || !h.exercises.length) { row(`<td colspan="4" style="padding:7px 10px;color:#475569;">—</td>`); return; }
+                    h.exercises.forEach(e => {
+                        if (e.kind === 'checklist') row(`<td style="padding:7px 10px;">${e.name}</td><td colspan="2"></td><td style="padding:7px 10px;">${e.done ? '✓' : '·'}</td>`);
+                        else if (e.kind === 'cardio') { const c = e.cardio || {}; row(`<td style="padding:7px 10px;">${e.name} · ${CARDIO_METHODS[c.method] || ''}</td><td colspan="2"></td><td style="padding:7px 10px;">${[c.km && c.km + 'km', c.time && c.time + 'min', c.rounds && c.rounds + 'rnd', c.ppm && c.ppm + 'ppm'].filter(Boolean).join(' ')}</td>`); }
+                        else if (e.kind === 'timer') (e.sets || []).forEach((s, i) => row(`<td style="padding:7px 10px;">${e.name}</td><td style="padding:7px 10px;">${i + 1}</td><td></td><td style="padding:7px 10px;">${fmt(Number(s.sec) || 0)} ${s.done ? '✓' : ''}</td>`));
+                        else (e.sets || []).forEach((s, i) => row(`<td style="padding:7px 10px;">${e.name}</td><td style="padding:7px 10px;color:#64748B;">${s.label || i + 1}</td><td style="padding:7px 10px;">${s.w || ''}</td><td style="padding:7px 10px;font-weight:700;">${s.r || ''}</td>`));
+                    });
+                });
+                html += `</table>`;
+                if (wl.length) {
+                    html += `<div style="font-size:14px;font-weight:800;margin:22px 0 8px;">Peso & Grasa</div><table style="${css}border-collapse:collapse;width:100%;font-size:12px;"><tr style="background:#3B82F6;color:#fff;text-align:left;"><th style="padding:8px 10px;">Fecha</th><th style="padding:8px 10px;">Peso (kg)</th><th style="padding:8px 10px;">Grasa (%)</th></tr>`;
+                    let a2 = false;
+                    wl.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(w => { const bg = (a2 = !a2) ? '#121826' : '#0F1521'; html += `<tr style="background:${bg};"><td style="padding:7px 10px;color:#94A3B8;">${w.date}</td><td style="padding:7px 10px;font-weight:700;">${w.w || ''}</td><td style="padding:7px 10px;">${w.fat || ''}</td></tr>`; });
+                    html += `</table>`;
+                }
+                html += `</body></html>`;
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([html], { type: 'application/vnd.ms-excel' }));
+                a.download = `MoldovanPower_informe_${todayStr()}.xls`; a.click();
+            };
+
+            const buildSeries = (key) => {
+                const m = METRICS[key]; if (!m) return { pts: [], unit: '', sec: false };
+                const pts = [];
+                if (m.src === 'weight' || m.src === 'fat') {
+                    [...weightLog].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(w => { const v = parseFloat(m.src === 'weight' ? w.w : w.fat); if (v > 0) pts.push({ v }); });
+                } else {
+                    [...history].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => {
+                        const ex = (h.exercises || []).find(e => e.name === m.ex); if (!ex) return;
+                        if (m.src === 'maxW') { const ws = (ex.sets || []).map(s => parseFloat(s.w)).filter(n => n > 0); if (ws.length) pts.push({ v: Math.max(...ws) }); }
+                        if (m.src === 'sumR') { const rs = (ex.sets || []).map(s => parseInt(s.r)).filter(n => n > 0); if (rs.length) pts.push({ v: rs.reduce((a, b) => a + b, 0) }); }
+                        if (m.src === 'maxSec') { const ss = (ex.sets || []).map(s => Number(s.sec) || 0).filter(n => n > 0); if (ss.length) pts.push({ v: Math.max(...ss) }); }
+                    });
+                }
+                return { pts, unit: m.unit, sec: m.src === 'maxSec' };
+            };
+
+            /* ---------- HEADER ---------- */
+            const Header = (
+                <div className="px-5 pt-[max(16px,var(--safe-t))] pb-3 flex items-center justify-between sticky top-0 z-20 bg-[#0B0F19]/85 backdrop-blur-xl">
+                    <div><h1 className="font-black text-xl tracking-tight leading-none">MOLDOVAN<span style={{ color: theme.accent }}>·POWER</span></h1><p className="text-[11px] text-slate-500 font-medium mt-1">Rehab · Barseagle × Uri</p></div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: streak > 0 ? '#F59E0B22' : '#1E293B' }}>
+                            <span style={{ color: streak > 0 ? '#F59E0B' : '#475569' }}><Ic d={I.flame} s={16} /></span>
+                            <span className="font-black text-sm" style={{ color: streak > 0 ? '#F59E0B' : '#475569' }}>{streak}</span>
+                        </div>
+                        <div className="text-right"><div className="text-[10px] uppercase tracking-widest font-bold text-slate-500">Toca</div><div className="text-sm font-bold" style={{ color: DAYS[suggestType].accent }}>{DAYS[suggestType].short}</div></div>
+                    </div>
+                </div>
+            );
+
+            const SetRows = (ex, i) => {
+                const showKg = ex.kind !== 'reps';
+                const total = (ex.sets || []).reduce((a, s) => a + (parseInt(s.r) || 0), 0);
+                return (<>
+                    {ex.sets.map((st, j) => (
+                        <div key={j} className="flex gap-2 items-stretch">
+                            <div className="w-12 flex items-center justify-center text-[10px] font-black text-slate-500 text-center">{st.label || j + 1}</div>
+                            {showKg && (<div className="flex-1 bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06]"><label className="text-[9px] block text-slate-500 font-bold uppercase">Peso kg</label><input type="number" inputMode="decimal" placeholder="0" value={st.w} onChange={e => updEx(i, x => { x.sets[j].w = e.target.value; return x; })} className="bg-transparent w-full font-black text-base outline-none" /></div>)}
+                            <div className="flex-1 bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06]"><label className="text-[9px] block text-slate-500 font-bold uppercase">Reps</label><input type="number" inputMode="numeric" placeholder="0" value={st.r} onChange={e => updEx(i, x => { x.sets[j].r = e.target.value; return x; })} className="bg-transparent w-full font-black text-base outline-none" /></div>
+                            {ex.sets.length > 1 && <button onClick={() => updEx(i, x => { x.sets.splice(j, 1); return x; })} className="w-7 flex items-center justify-center text-slate-700 tap"><Ic d={I.trash} s={15} /></button>}
+                        </div>
+                    ))}
+                    <button onClick={() => updEx(i, x => { x.sets.push({ w: x.sets.at(-1)?.w || '', r: '' }); return x; })} className="w-full py-2.5 border border-dashed border-white/10 rounded-xl text-xs font-bold text-slate-500 flex items-center justify-center gap-1 tap"><Ic d={I.plus} s={14} /> Añadir serie</button>
+                    {ex.sets.length > 1 && total > 0 && <div className="text-right text-[11px] font-bold text-slate-500 pt-0.5">Total entreno: <span style={{ color: theme.accent }}>{total} reps</span></div>}
+                </>);
+            };
+
+            const ExerciseCard = (ex, i) => {
+                const last = lastPerf(ex.name);
+                return (<Card key={i} className="overflow-hidden fade-in">
+                    <div className="px-4 py-3 flex items-center justify-between border-b border-white/[0.06]" style={{ background: theme.accent + '12' }}>
+                        <div className="min-w-0"><div className="font-bold text-sm truncate" style={{ color: theme.accent }}>{ex.name}</div>{last && <div className="text-[10px] text-slate-500 mt-0.5 truncate">{last}</div>}</div>
+                        <div className="flex items-center gap-3 shrink-0 ml-2">{ex.video && <a href={ex.video} target="_blank" rel="noreferrer" className="text-slate-400 tap"><Ic d={I.play} s={20} /></a>}<button onClick={() => delExAt(i)} className="text-slate-600 tap"><Ic d={I.trash} s={17} /></button></div>
+                    </div>
+                    {ex.kind === 'cardio' ? <CardioBlock ex={ex} accent={theme.accent} onChange={u => updEx(i, () => u)} /> : (
+                        <div className="p-4 space-y-3">
+                            {ex.note && <p className="text-[11px] leading-relaxed text-slate-400 bg-white/[0.03] rounded-xl p-2.5">{ex.note}</p>}
+                            {ex.kind === 'checklist' && <button onClick={() => updEx(i, e => ({ ...e, done: !e.done }))} className="w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 tap border" style={ex.done ? { background: theme.accent, borderColor: theme.accent, color: '#fff' } : { borderColor: '#ffffff18', color: '#94a3b8' }}><Ic d={I.check} s={18} /> {ex.done ? 'Completado' : 'Marcar como hecho'}</button>}
+                            {ex.kind === 'timer' && (<>
+                                {ex.sets.map((st, j) => <TimerSet key={j} st={st} halfBeep={ex.halfBeep} accent={theme.accent} canDel={ex.sets.length > 1} onDel={() => updEx(i, x => { x.sets.splice(j, 1); return x; })} onChange={u => updEx(i, x => { x.sets[j] = u; return x; })} />)}
+                                <button onClick={() => updEx(i, x => { x.sets.push({ sec: x.sets.at(-1)?.sec || 60, done: false }); return x; })} className="w-full py-2.5 border border-dashed border-white/10 rounded-xl text-xs font-bold text-slate-500 flex items-center justify-center gap-1 tap"><Ic d={I.plus} s={14} /> Añadir serie</button>
+                            </>)}
+                            {(ex.kind === 'weighted' || ex.kind === 'reps') && SetRows(ex, i)}
+                        </div>
+                    )}
+                </Card>);
+            };
+
+            // Diario semana
+            const weekDays = useMemo(() => {
+                const base = new Date(); base.setHours(0, 0, 0, 0);
+                const dow = (base.getDay() + 6) % 7; // lunes=0
+                const mon = new Date(base); mon.setDate(base.getDate() - dow + weekOff * 7);
+                return Array.from({ length: 7 }, (_, k) => { const d = new Date(mon); d.setDate(mon.getDate() + k); return dstr(d); });
+            }, [weekOff]);
+            // Diario mes
+            const monthGrid = useMemo(() => {
+                const now = new Date(); const m = new Date(now.getFullYear(), now.getMonth() + monOff, 1);
+                const first = (m.getDay() + 6) % 7; const days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+                const cells = []; for (let i = 0; i < first; i++) cells.push(null);
+                for (let d = 1; d <= days; d++) cells.push(dstr(new Date(m.getFullYear(), m.getMonth(), d)));
+                return { label: m.toLocaleDateString('es', { month: 'long', year: 'numeric' }), cells };
+            }, [monOff]);
+
+            return (
+                <div className="min-h-screen text-slate-100 max-w-md mx-auto flex flex-col" style={{ '--accent': theme.accent }}>
+                    {Header}
+                    <div className="flex-1 overflow-y-auto no-scrollbar px-4 pb-28">
+
+                        {tab === 'today' && (
+                            <div className="space-y-4 pt-2">
+                                <Card className="p-2 flex items-center gap-2">
+                                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent flex-1 font-bold px-2 outline-none" />
+                                    <select value={dayType} onChange={e => changeDay(e.target.value)} className="bg-transparent font-black uppercase text-sm text-right outline-none px-2" style={{ color: theme.accent }}>{ORDER.map(k => <option key={k} value={k}>{DAYS[k].label}</option>)}</select>
+                                </Card>
+                                <div className="flex items-center gap-2 px-1"><div className="h-2 w-2 rounded-full" style={{ background: theme.accent }} /><span className="text-xs font-semibold text-slate-400">{theme.sub}</span></div>
+
+                                {dayType === 'pull' && (
+                                    <Card className="p-4 space-y-3">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Estrategia 2-set · 1RM +{profile.oneRM}kg</span>
+                                        <div className="text-[10px] text-slate-500 bg-[#0B0F19] rounded-lg py-1.5 text-center font-bold">Cal. 0 · 0 kg × 5 reps</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 1 · 5 reps</div><div className="font-black">+{strat.cal1}kg</div></div>
+                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 2 · 3 reps</div><div className="font-black">+{strat.cal2}kg</div></div>
+                                            <div className="rounded-xl p-2.5 text-center" style={{ background: theme.accent + '22' }}><div className="text-[9px] font-bold uppercase" style={{ color: theme.accent }}>Serie 1 · 6-10</div><div className="font-black" style={{ color: theme.accent }}>+{strat.s1}kg</div></div>
+                                            <div className="rounded-xl p-2.5 text-center" style={{ background: theme.accent + '22' }}><div className="text-[9px] font-bold uppercase" style={{ color: theme.accent }}>Serie 2 · 10-15</div><div className="font-black" style={{ color: theme.accent }}>+{strat.s2}kg</div></div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500">S1 al fallo técnico. Sube el 1RM en Ajustes y se recalcula.</p>
+                                    </Card>
+                                )}
+
+                                {session.exercises.map((ex, i) => ExerciseCard(ex, i))}
+
+                                {(SUGGEST[dayType] || []).length > 0 && (
+                                    <div className="flex flex-wrap gap-2">{SUGGEST[dayType].map(s => <button key={s.name} onClick={() => pushEx(s)} className="px-3 py-2 rounded-xl text-[11px] font-bold border border-white/10 text-slate-300 tap flex items-center gap-1"><Ic d={I.plus} s={13} /> {s.name}</button>)}</div>
+                                )}
+
+                                {adding ? (
+                                    <Card className="p-4 space-y-3 fade-in">
+                                        <input autoFocus placeholder="Nombre del ejercicio" value={newEx.name} onChange={e => setNewEx({ ...newEx, name: e.target.value })} className="w-full bg-[#0B0F19] border border-white/[0.06] rounded-xl p-3 outline-none" />
+                                        <select value={newEx.kind} onChange={e => setNewEx({ ...newEx, kind: e.target.value })} className="w-full bg-[#0B0F19] border border-white/[0.06] rounded-xl p-3 outline-none"><option value="weighted">Peso + reps</option><option value="reps">Solo reps</option><option value="timer">Temporizador</option><option value="checklist">Checklist</option><option value="cardio">Cardio</option></select>
+                                        <div className="flex gap-2"><button onClick={() => setAdding(false)} className="flex-1 py-3 rounded-xl border border-white/10 font-bold text-sm text-slate-400 tap">Cancelar</button><button onClick={addEx} className="flex-1 py-3 rounded-xl font-bold text-sm text-white tap" style={{ background: theme.accent }}>Añadir</button></div>
+                                    </Card>
+                                ) : <button onClick={() => setAdding(true)} className="w-full py-3 border border-dashed border-white/10 rounded-2xl text-sm font-bold text-slate-500 flex items-center justify-center gap-2 tap"><Ic d={I.plus} s={16} /> Añadir ejercicio</button>}
+
+                                {dayType !== 'light' && (
+                                    <Card className="overflow-hidden">
+                                        <button onClick={() => setCardioOpen(o => !o)} className="w-full px-4 py-3 flex items-center justify-between tap"><span className="font-bold text-sm flex items-center gap-2 text-slate-300"><Ic d={I.heart} s={16} /> Añadir cardio</span><span className="text-slate-500" style={{ transform: cardioOpen ? 'rotate(90deg)' : 'none', transition: '.2s' }}><Ic d={I.chev} s={18} /></span></button>
+                                        {cardioOpen && <div className="px-4 pb-4 grid grid-cols-2 gap-2 fade-in">{Object.keys(CARDIO_METHODS).map(m => <button key={m} onClick={() => addCardio(m)} className="py-3 rounded-xl text-xs font-bold border border-white/10 text-slate-300 tap">{CARDIO_METHODS[m]}</button>)}</div>}
+                                    </Card>
+                                )}
+
+                                <Card className="p-4 space-y-5">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Dolor articular</h3>
+                                    <PainSlider label="Muñeca derecha" value={session.pain.wrist} onChange={v => setSession(s => ({ ...s, pain: { ...s.pain, wrist: v } }))} />
+                                    <PainSlider label="Rodilla izquierda" value={session.pain.knee} onChange={v => setSession(s => ({ ...s, pain: { ...s.pain, knee: v } }))} />
+                                    <textarea placeholder="Notas, sensaciones, molestias…" value={session.notes} onChange={e => setSession(s => ({ ...s, notes: e.target.value }))} className="w-full bg-[#0B0F19] border border-white/[0.06] rounded-xl p-3 text-sm outline-none h-24 resize-none" />
+                                </Card>
+
+                                <button onClick={save} className="w-full py-5 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2 tap" style={{ background: theme.accent, boxShadow: `0 10px 30px -10px ${theme.accent}` }}><Ic d={I.save} /> GUARDAR SESIÓN</button>
+                            </div>
+                        )}
+
+                        {tab === 'weight' && (
+                            <div className="space-y-4 pt-2">
+                                <h2 className="text-2xl font-black px-1">Peso</h2>
+                                <Card className="p-5 space-y-3">
+                                    <input type="date" value={wForm.date} onChange={e => setWForm({ ...wForm, date: e.target.value })} className="w-full bg-[#0B0F19] border border-white/[0.06] rounded-xl p-3 font-bold outline-none" />
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06]"><label className="text-[9px] block text-slate-500 font-bold uppercase">Peso (kg)</label><input type="number" inputMode="decimal" placeholder="0" value={wForm.w} onChange={e => setWForm({ ...wForm, w: e.target.value })} className="bg-transparent w-full font-black text-lg outline-none" /></div>
+                                        <div className="flex-1 bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06]"><label className="text-[9px] block text-slate-500 font-bold uppercase">% Grasa (báscula)</label><input type="number" inputMode="decimal" placeholder="0" value={wForm.fat} onChange={e => setWForm({ ...wForm, fat: e.target.value })} className="bg-transparent w-full font-black text-lg outline-none" /></div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500">El % de grasa de la báscula es orientativo, no exacto. Úsalo como tendencia.</p>
+                                    <button onClick={saveWeight} className="w-full py-3.5 rounded-xl font-black text-sm text-white tap flex items-center justify-center gap-2" style={{ background: '#14B8A6' }}><Ic d={I.save} s={18} /> Registrar</button>
+                                </Card>
+                                <div className="space-y-2">
+                                    {weightLog.length === 0 && <Card className="p-8 text-center text-xs font-bold uppercase tracking-widest text-slate-600">Sin registros</Card>}
+                                    {weightLog.slice(0, 30).map((w, k) => {
+                                        const prev = weightLog[k + 1]; const dl = prev ? (parseFloat(w.w) - parseFloat(prev.w)) : 0;
+                                        return (<Card key={w.date} className="p-4 flex items-center justify-between">
+                                            <div><div className="font-black text-sm">{w.date}</div><div className="text-[11px] text-slate-500 font-bold mt-0.5">{w.w} kg{w.fat ? ` · ${w.fat}% grasa` : ''}</div></div>
+                                            <div className="flex items-center gap-3">
+                                                {prev && <span className="text-[11px] font-bold" style={{ color: dl <= 0 ? '#10B981' : '#F43F5E' }}>{dl > 0 ? '+' : ''}{dl.toFixed(1)}</span>}
+                                                <button onClick={() => delWeight(w.date)} className="text-slate-700 tap"><Ic d={I.trash} s={15} /></button>
+                                            </div>
+                                        </Card>);
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {tab === 'stats' && (
+                            <div className="space-y-4 pt-2">
+                                <h2 className="text-2xl font-black px-1">Progreso</h2>
+                                {[0, 1, 2].map(slot => {
+                                    const key = charts[slot]; const { pts, unit, sec } = buildSeries(key);
+                                    return (<Card key={slot} className="p-5 space-y-2">
+                                        <select value={key} onChange={e => setCharts(c => c.map((x, i) => i === slot ? e.target.value : x))} className="w-full bg-[#0B0F19] border border-white/[0.06] rounded-xl p-2.5 font-bold text-sm outline-none mb-2">
+                                            {Object.keys(METRICS).map(m => <option key={m} value={m}>{METRICS[m].label}</option>)}
+                                        </select>
+                                        <MiniChart pts={pts} unit={unit} accent={theme.accent} secMode={sec} />
+                                    </Card>);
+                                })}
+                            </div>
+                        )}
+
+                        {tab === 'diary' && (
+                            <div className="space-y-4 pt-2">
+                                <div className="flex items-center justify-between px-1"><h2 className="text-2xl font-black">Diario</h2>
+                                    <div className="flex bg-[#121826] border border-white/[0.06] rounded-xl p-1">
+                                        {['week', 'month'].map(v => <button key={v} onClick={() => setDiaryView(v)} className="px-3 py-1.5 rounded-lg text-xs font-bold tap" style={diaryView === v ? { background: theme.accent, color: '#fff' } : { color: '#64748b' }}>{v === 'week' ? 'Semana' : 'Mes'}</button>)}
+                                    </div>
+                                </div>
+
+                                {diaryView === 'week' && (<>
+                                    <div className="flex items-center justify-between">
+                                        <button onClick={() => setWeekOff(o => o - 1)} className="p-2 text-slate-500 tap" style={{ transform: 'rotate(180deg)' }}><Ic d={I.arrow} s={18} /></button>
+                                        <span className="text-xs font-bold text-slate-400">{weekOff === 0 ? 'Esta semana' : `${weekDays[0]} → ${weekDays[6]}`}</span>
+                                        <button onClick={() => setWeekOff(o => Math.min(0, o + 1))} className="p-2 text-slate-500 tap"><Ic d={I.arrow} s={18} /></button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {weekDays.map(ds => {
+                                            const h = history.find(x => x.date === ds); const w = weightLog.find(x => x.date === ds);
+                                            const dd = h ? (DAYS[h.dayType] || DAYS.rest) : null;
+                                            const wd = new Date(ds).toLocaleDateString('es', { weekday: 'short' });
+                                            const isToday = ds === todayStr();
+                                            return (<div key={ds} onClick={() => h && setExpanded(expanded === h.id ? null : h.id)}
+                                                className="rounded-2xl p-4 flex items-center justify-between tap border" style={h ? { background: dd.accent + '1F', borderColor: dd.accent + '55' } : { background: '#121826', borderColor: isToday ? '#ffffff22' : 'transparent' }}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 text-center"><div className="text-[10px] uppercase font-bold text-slate-500">{wd}</div><div className="font-black text-lg" style={h ? { color: dd.accent } : { color: '#475569' }}>{new Date(ds).getDate()}</div></div>
+                                                    <div>{h ? (<><div className="font-bold text-sm" style={{ color: dd.accent }}>{dd.label}</div><div className="text-[10px] text-slate-500 font-bold">{(h.exercises || []).length} ej{(h.pain.wrist || h.pain.knee) ? ` · ✋${h.pain.wrist} 🦵${h.pain.knee}` : ''}{w ? ` · ${w.w}kg` : ''}</div></>) : (<div className="text-xs font-bold text-slate-600">{w ? `${w.w} kg registrado` : (isToday ? 'Hoy — sin registrar' : 'Sin entreno')}</div>)}</div>
+                                                </div>
+                                                {h && expanded === h.id && <Ic d={I.chev} s={16} c="#64748b" />}
+                                            </div>);
+                                        })}
+                                    </div>
+                                    {(() => { const h = history.find(x => x.id === expanded && weekDays.includes(x.date)); if (!h) return null; const dd = DAYS[h.dayType] || DAYS.rest;
+                                        return (<Card className="p-4 space-y-2 fade-in">
+                                            {(h.exercises || []).map((e, k) => { let det = e.kind === 'checklist' ? (e.done ? '✓ Completado' : '— No') : e.kind === 'timer' ? (e.sets || []).map(s => fmt(Number(s.sec) || 0)).join(' · ') : e.kind === 'cardio' ? `${CARDIO_METHODS[(e.cardio || {}).method] || ''}` : (e.sets || []).map(s => `${s.label ? s.label + ' ' : ''}${s.w ? '+' + s.w + 'kg ' : ''}${s.r || 0}r`).join('  ·  ');
+                                                return <div key={k} className="text-xs"><span className="font-bold" style={{ color: dd.accent }}>{e.name}</span> <span className="text-slate-400">{det}</span></div>; })}
+                                            {h.notes && <p className="text-xs text-slate-500 italic">“{h.notes}”</p>}
+                                            <button onClick={() => delEntry(h.id)} className="text-[11px] font-bold text-rose-500/80 flex items-center gap-1 tap"><Ic d={I.trash} s={13} /> Borrar</button>
+                                        </Card>); })()}
+                                </>)}
+
+                                {diaryView === 'month' && (<>
+                                    <div className="flex items-center justify-between">
+                                        <button onClick={() => setMonOff(o => o - 1)} className="p-2 text-slate-500 tap" style={{ transform: 'rotate(180deg)' }}><Ic d={I.arrow} s={18} /></button>
+                                        <span className="text-xs font-bold text-slate-400 capitalize">{monthGrid.label}</span>
+                                        <button onClick={() => setMonOff(o => Math.min(0, o + 1))} className="p-2 text-slate-500 tap"><Ic d={I.arrow} s={18} /></button>
+                                    </div>
+                                    <Card className="p-4">
+                                        <div className="grid grid-cols-7 gap-1.5 mb-2">{['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((d, i) => <div key={i} className="text-center text-[10px] font-black text-slate-600">{d}</div>)}</div>
+                                        <div className="grid grid-cols-7 gap-1.5">
+                                            {monthGrid.cells.map((ds, i) => {
+                                                if (!ds) return <div key={i} />;
+                                                const h = history.find(x => x.date === ds); const w = weightLog.find(x => x.date === ds);
+                                                const dd = h ? (DAYS[h.dayType] || DAYS.rest) : null; const isToday = ds === todayStr();
+                                                return (<div key={i} onClick={() => h && (setDiaryView('week'), setExpanded(h.id))}
+                                                    className="aspect-square rounded-lg flex items-center justify-center text-[11px] font-black tap"
+                                                    style={h ? { background: dd.accent, color: '#fff' } : { background: w ? '#1E293B' : '#0F1521', color: '#475569', outline: isToday ? '1.5px solid #ffffff33' : 'none' }}>
+                                                    {new Date(ds).getDate()}
+                                                </div>);
+                                            })}
+                                        </div>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-4 pt-3 border-t border-white/[0.06]">{ORDER.map(k => <div key={k} className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm" style={{ background: DAYS[k].accent }} /><span className="text-[9px] font-bold text-slate-500">{DAYS[k].short}</span></div>)}</div>
+                                    </Card>
+                                </>)}
+                            </div>
+                        )}
+
+                        {tab === 'conf' && (
+                            <div className="space-y-4 pt-2">
+                                <h2 className="text-2xl font-black px-1">Ajustes</h2>
+                                <Card className="p-5 space-y-4">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Perfil</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">Peso corporal (kg)</label><input type="number" inputMode="decimal" value={profile.bw} onChange={e => setProfile(p => ({ ...p, bw: e.target.value }))} className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06] w-full font-black mt-1" /></div>
+                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">1RM dominada (kg lastre)</label><input type="number" inputMode="decimal" value={profile.oneRM} onChange={e => setProfile(p => ({ ...p, oneRM: e.target.value }))} className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06] w-full font-black mt-1" /></div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500">Estrategia 2-set: Cal.1 40% · Cal.2 60% · S1 75% · S2 60%. “Toca” avanza al siguiente día tras el último guardado.</p>
+                                </Card>
+                                <Card className="p-5 space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recordatorio</h3>
+                                    <button onClick={reqNotif} className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 tap" style={notif === 'granted' ? { background: theme.accent, color: '#fff' } : { background: '#0B0F19', border: '1px solid #ffffff14', color: '#94a3b8' }}><Ic d={I.bell} s={18} /> {notif === 'granted' ? 'Recordatorio activado (19:30)' : notif === 'unsupported' ? 'No soportado en este navegador' : 'Activar recordatorio 19:30'}</button>
+                                    <p className="text-[10px] text-slate-500">Si a las 19:30 no has entrenado ni registrado nada, te avisa para no perder la racha. Requiere tener la app abierta o instalada en pantalla de inicio (Android). Una web no puede notificar de forma garantizada si está totalmente cerrada.</p>
+                                </Card>
+                                <Card className="p-5 space-y-4">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Copia de seguridad</h3>
+                                    <button onClick={exportBackup} className="w-full bg-[#0B0F19] border border-white/[0.06] py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 tap"><Ic d={I.save} s={18} /> Descargar copia (JSON)</button>
+                                    <input type="file" ref={fileRef} onChange={importBackup} className="hidden" accept=".json" />
+                                    <button onClick={() => fileRef.current.click()} className="w-full border border-white/10 py-3.5 rounded-xl font-bold text-sm text-slate-400 flex items-center justify-center gap-2 tap"><Ic d={I.up} s={18} /> Restaurar copia (JSON)</button>
+                                </Card>
+                                <Card className="p-5 space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Informe</h3>
+                                    <div className="flex gap-1.5">{[[30, '1M'], [90, '3M'], [180, '6M'], [365, '1A'], [9999, 'TODO']].map(([rv, l]) => <button key={rv} onClick={() => setRange(rv)} className="flex-1 py-2 text-[11px] font-bold rounded-lg border tap" style={range === rv ? { background: theme.accent, borderColor: theme.accent, color: '#fff' } : { borderColor: '#ffffff14', color: '#64748b' }}>{l}</button>)}</div>
+                                    <button onClick={exportReport} className="w-full bg-[#0B0F19] border border-white/[0.06] py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 tap"><Ic d={I.sheet} s={18} /> Descargar informe</button>
+                                </Card>
+                                <p className="text-center text-[10px] text-slate-600 pt-2">Moldovan Power · datos en este dispositivo</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto z-30">
+                        <div className="bg-[#121826]/90 backdrop-blur-xl border-t border-white/[0.06] flex px-1 pb-[max(10px,var(--safe-b))] pt-2">
+                            {[['today', I.today, 'Hoy'], ['weight', I.scale, 'Peso'], ['stats', I.chart, 'Progreso'], ['diary', I.diary, 'Diario'], ['conf', I.cog, 'Ajustes']].map(([k, ic, lb]) => (
+                                <button key={k} onClick={() => setTab(k)} className="flex-1 flex flex-col items-center gap-1 py-1.5 tap" style={{ color: tab === k ? theme.accent : '#475569' }}><Ic d={ic} s={21} /><span className="text-[10px] font-bold">{lb}</span></button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {toast && <div className="fixed top-[max(20px,var(--safe-t))] inset-x-0 flex justify-center z-50 pointer-events-none px-4"><div className="bg-white text-slate-900 text-sm font-bold px-5 py-2.5 rounded-full shadow-2xl fade-in flex items-center gap-2 text-center"><Ic d={I.check} s={16} /> {toast}</div></div>}
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+    </script>
+</body>
+</html>
