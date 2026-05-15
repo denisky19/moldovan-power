@@ -1,0 +1,18 @@
+{
+  "name": "Moldovan Power",
+  "short_name": "Moldovan",
+  "start_url": "./MoldovanPower.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0F19",
+  "theme_color": "#0B0F19",
+  "icons": [
+    {
+      "src": "MoldovanPower_logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
