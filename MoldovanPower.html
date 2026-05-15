@@ -122,11 +122,11 @@
         };
         const SUGGEST = { push: [{ name: 'Flexiones a puños', kind: 'reps', note: 'Vuelta si molesta la muñeca.' }] };
 
-        const todayStr = () => new Date().toISOString().split('T')[0];
-        const dstr = (d) => d.toISOString().split('T')[0];
+        const dstr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const todayStr = () => dstr(new Date());
         const r05 = (v) => Math.round(v * 2) / 2;
         const STRAT = (rm) => { const m = Number(rm) || 0; return { cal1: r05(m * 0.40), cal2: r05(m * 0.60), s1: r05(m * 0.75), s2: r05(m * 0.75 * 0.80) }; };
-        const seed = (t, rm) => {
+        const seed = (t, rm, prevEx) => {
             const ex = JSON.parse(JSON.stringify(TEMPLATES[t] || []));
             if (t === 'pull') {
                 const s = STRAT(rm);
@@ -138,6 +138,17 @@
                     { label: 'Serie 1', w: String(s.s1), r: '' },
                     { label: 'Serie 2', w: String(s.s2), r: '' },
                 ];
+            }
+            if (prevEx && prevEx.length) {
+                ex.forEach(e => {
+                    const p = prevEx.find(x => x.name === e.name);
+                    if (p && Array.isArray(p.sets) && Array.isArray(e.sets)) {
+                        e.sets.forEach((st, i) => {
+                            const ps = p.sets[i];
+                            if (ps && ps.w !== undefined && ps.w !== '') st.w = String(ps.w);
+                        });
+                    }
+                });
             }
             return ex;
         };
@@ -305,13 +316,15 @@
             const dayType = session.dayType || suggestType;
             const theme = DAYS[dayType] || DAYS.rest;
 
+            const lastSame = (t) => { const h = history.find(x => x.dayType === t && x.date !== date); return h ? h.exercises : null; };
+
             useEffect(() => {
                 const saved = history.find(h => h.date === date);
                 if (saved) setSession({ dayType: saved.dayType, pain: { ...saved.pain }, notes: saved.notes, exercises: JSON.parse(JSON.stringify(saved.exercises)) });
-                else setSession({ dayType: suggestType, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(suggestType, profile.oneRM) });
+                else setSession({ dayType: suggestType, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(suggestType, profile.oneRM, lastSame(suggestType)) });
             }, [date]);
 
-            const changeDay = (t) => setSession(s => ({ ...s, dayType: t, exercises: seed(t, profile.oneRM) }));
+            const changeDay = (t) => setSession(s => ({ ...s, dayType: t, exercises: seed(t, profile.oneRM, lastSame(t)) }));
             const lastPerf = (name) => {
                 const h = history.filter(x => x.date !== date).find(x => (x.exercises || []).some(e => e.name === name));
                 if (!h) return null;
