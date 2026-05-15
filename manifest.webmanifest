@@ -1,18 +1,35 @@
 {
+  "id": "/moldovan-power/",
   "name": "Moldovan Power",
   "short_name": "Moldovan",
+  "description": "Seguimiento de entrenamiento en readaptación: ciclo 7 días, método 2-set, peso, progreso y diario.",
   "start_url": "./MoldovanPower.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0B0F19",
   "theme_color": "#0B0F19",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["health", "fitness", "lifestyle"],
   "icons": [
     {
-      "src": "MoldovanPower_logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
