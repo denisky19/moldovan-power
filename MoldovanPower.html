@@ -125,16 +125,16 @@
         const dstr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const todayStr = () => dstr(new Date());
         const r05 = (v) => Math.round(v * 2) / 2;
-        const STRAT = (rm) => { const m = Number(rm) || 0; return { cal1: r05(m * 0.40), cal2: r05(m * 0.60), s1: r05(m * 0.75), s2: r05(m * 0.75 * 0.80) }; };
+        const STRAT = (rm) => { const m = Number(rm) || 0; return { cal2: r05(m * 0.60), cal3: r05(m * 0.80), s1: r05(m * 0.75), s2: r05(m * 0.75 * 0.80) }; };
         const seed = (t, rm, prevEx) => {
             const ex = JSON.parse(JSON.stringify(TEMPLATES[t] || []));
             if (t === 'pull') {
                 const s = STRAT(rm);
                 const d = ex.find(e => e.name === 'Dominadas lastradas');
                 if (d) d.sets = [
-                    { label: 'Cal. 0', w: '0', r: '5' },
-                    { label: 'Cal. 1', w: String(s.cal1), r: '' },
-                    { label: 'Cal. 2', w: String(s.cal2), r: '' },
+                    { label: 'Cal. 1', w: '0', r: '5' },
+                    { label: 'Cal. 2', w: String(s.cal2), r: '3' },
+                    { label: 'Cal. 3', w: String(s.cal3), r: '1-2' },
                     { label: 'Serie 1', w: String(s.s1), r: '' },
                     { label: 'Serie 2', w: String(s.s2), r: '' },
                 ];
@@ -528,14 +528,18 @@
                                 {dayType === 'pull' && (
                                     <Card className="p-4 space-y-3">
                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Estrategia 2-set · 1RM +{profile.oneRM}kg</span>
-                                        <div className="text-[10px] text-slate-500 bg-[#0B0F19] rounded-lg py-1.5 text-center font-bold">Cal. 0 · 0 kg × 5 reps</div>
+                                        <div className="text-[9px] font-bold uppercase tracking-widest text-slate-600 px-1">Calentamiento</div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 1 · 5</div><div className="font-black">Sin peso</div></div>
+                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 2 · 3</div><div className="font-black">+{strat.cal2}kg</div></div>
+                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 3 · 1-2</div><div className="font-black">+{strat.cal3}kg</div></div>
+                                        </div>
+                                        <div className="text-[9px] font-bold uppercase tracking-widest text-slate-600 px-1">Trabajo</div>
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 1 · 5 reps</div><div className="font-black">+{strat.cal1}kg</div></div>
-                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 2 · 3 reps</div><div className="font-black">+{strat.cal2}kg</div></div>
                                             <div className="rounded-xl p-2.5 text-center" style={{ background: theme.accent + '22' }}><div className="text-[9px] font-bold uppercase" style={{ color: theme.accent }}>Serie 1 · 6-10</div><div className="font-black" style={{ color: theme.accent }}>+{strat.s1}kg</div></div>
                                             <div className="rounded-xl p-2.5 text-center" style={{ background: theme.accent + '22' }}><div className="text-[9px] font-bold uppercase" style={{ color: theme.accent }}>Serie 2 · 10-15</div><div className="font-black" style={{ color: theme.accent }}>+{strat.s2}kg</div></div>
                                         </div>
-                                        <p className="text-[10px] text-slate-500">S1 al fallo técnico. Sube el 1RM en Ajustes y se recalcula.</p>
+                                        <p className="text-[10px] text-slate-500">Cal. al % del 1RM (60% / 80%). S1 al fallo técnico. Sube el 1RM en Ajustes y se recalcula.</p>
                                     </Card>
                                 )}
 
@@ -688,7 +692,7 @@
                                         <div><label className="text-[10px] font-bold text-slate-500 uppercase">Peso corporal (kg)</label><input type="number" inputMode="decimal" value={profile.bw} onChange={e => setProfile(p => ({ ...p, bw: e.target.value }))} className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06] w-full font-black mt-1" /></div>
                                         <div><label className="text-[10px] font-bold text-slate-500 uppercase">1RM dominada (kg lastre)</label><input type="number" inputMode="decimal" value={profile.oneRM} onChange={e => setProfile(p => ({ ...p, oneRM: e.target.value }))} className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06] w-full font-black mt-1" /></div>
                                     </div>
-                                    <p className="text-[10px] text-slate-500">Estrategia 2-set: Cal.1 40% · Cal.2 60% · S1 75% · S2 60%. “Toca” avanza al siguiente día tras el último guardado.</p>
+                                    <p className="text-[10px] text-slate-500">Estrategia 2-set: Cal.1 sin peso 5r · Cal.2 60% 3r · Cal.3 80% 1-2r · S1 75% · S2 60%. “Toca” avanza al siguiente día tras el último guardado.</p>
                                 </Card>
                                 <Card className="p-5 space-y-3">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recordatorio</h3>
