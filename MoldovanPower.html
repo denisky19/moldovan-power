@@ -47,7 +47,7 @@
                 const o = actx.createOscillator(), g = actx.createGain();
                 o.connect(g); g.connect(actx.destination); o.type = 'sine'; o.frequency.value = freq;
                 const t = actx.currentTime;
-                g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+                g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.85, t + 0.01);
                 g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
                 o.start(t); o.stop(t + ms / 1000);
             } catch (e) {}
@@ -87,7 +87,7 @@
             mobility: { label: 'Movilidad / Pies', short: 'Movil', sub: 'Pies, columna y movilidad',          accent: '#F59E0B' },
             push:     { label: 'Empuje',           short: 'Push', sub: 'Dips',                                 accent: '#F43F5E' },
             core:     { label: 'Core',             short: 'Core', sub: 'Isometrías por tiempo',               accent: '#8B5CF6' },
-            light:    { label: 'Ligero',           short: 'Light', sub: 'Actividad ligera',                   accent: '#14B8A6' },
+            light:    { label: 'Kettlebell',       short: 'Kettle', sub: 'Entreno con kettlebell',           accent: '#14B8A6' },
             rest:     { label: 'Descanso',         short: 'Rest', sub: 'Recuperación',                        accent: '#64748B' },
         };
 
@@ -110,14 +110,14 @@
                 { name: 'Bird dog', kind: 'reps', note: '4 series.', sets: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }] },
             ],
             push: [
-                { name: 'Dips (sin lastre)', kind: 'weighted', note: 'Objetivo: series de 20. Progresa añadiendo serie o reps. El peso queda en 0 hasta que subas.', sets: [{ w: '', r: '' }] },
+                { name: 'Dips', kind: 'weighted', note: 'Objetivo: series de 20. Progresa añadiendo serie o reps. El peso queda en 0 hasta que subas.', sets: [{ w: '', r: '' }] },
             ],
             core: [
                 { name: 'Plancha (codos)', kind: 'timer', note: 'Edita los minutos por serie. Pitido los últimos 3 s.', sets: [{ sec: 120, done: false }] },
                 { name: 'Dead bug', kind: 'timer', note: 'Por tiempo.', sets: [{ sec: 45, done: false }] },
                 { name: 'Anti-rotación (pallof)', kind: 'timer', halfBeep: true, note: 'Suena a la mitad: cambia de lado.', sets: [{ sec: 90, done: false }] },
             ],
-            light: [{ name: 'Cardio', kind: 'cardio', cardio: { method: 'walk', km: '', time: '', ppm: '', rounds: '' } }],
+            light: [],
             rest: [],
         };
         const SUGGEST = { push: [{ name: 'Flexiones a puños', kind: 'reps', note: 'Vuelta si molesta la muñeca.' }] };
@@ -164,6 +164,7 @@
             if (!pain) pain = { wrist: 0, knee: 0 };
             let exercises = e.exercises;
             if (!exercises && Array.isArray(e.exs)) exercises = e.exs.map(x => ({ name: x.n || 'Ejercicio', kind: 'weighted', sets: (x.s || []).map(s => ({ w: s.w ?? '', r: s.r ?? '' })) }));
+            if (Array.isArray(exercises)) exercises.forEach(ex => { if (ex && ex.name === 'Dips (sin lastre)') ex.name = 'Dips'; });
             return { id: e.id || Date.now() + Math.random(), date: e.date || todayStr(), dayType, bw: e.bw ?? '', pain: { wrist: Number(pain.wrist) || 0, knee: Number(pain.knee) || 0 }, notes: e.notes || '', exercises: Array.isArray(exercises) ? exercises : [] };
         };
         const profileFrom = (p = {}) => ({ bw: p.bw ?? 85, oneRM: p.oneRM ?? p.pullRef ?? p.pull ?? 40 });
@@ -172,11 +173,13 @@
         const loadWeight = () => { try { return (JSON.parse(localStorage.getItem('mp2_weight') || '[]') || []).filter(x => x && x.date).sort((a, b) => new Date(b.date) - new Date(a.date)); } catch { return []; } };
 
         const METRICS = {
-            weight: { label: 'Peso corporal', unit: ' kg', src: 'weight' },
-            fat:    { label: '% Grasa (báscula)', unit: ' %', src: 'fat' },
-            pull:   { label: 'Dominadas (kg lastre)', unit: ' kg', src: 'maxW', ex: 'Dominadas lastradas' },
-            dips:   { label: 'Dips (reps totales)', unit: ' reps', src: 'sumR', ex: 'Dips (sin lastre)' },
-            plank:  { label: 'Plancha (tiempo)', unit: '', src: 'maxSec', ex: 'Plancha (codos)' },
+            weight:    { label: 'Peso corporal', unit: ' kg', src: 'weight' },
+            fat:       { label: '% Grasa (báscula)', unit: ' %', src: 'fat' },
+            pull:      { label: 'Dominadas (kg lastre)', unit: ' kg', src: 'maxW', ex: 'Dominadas lastradas' },
+            dips:      { label: 'Dips (reps totales)', unit: ' reps', src: 'sumR', ex: 'Dips' },
+            plank:     { label: 'Plancha (tiempo)', unit: '', src: 'maxSec', ex: 'Plancha (codos)' },
+            painWrist: { label: 'Dolor muñeca derecha', unit: '/10', src: 'wrist' },
+            painKnee:  { label: 'Dolor rodilla izq.',   unit: '/10', src: 'knee' },
         };
 
         /* ---------- UI BASE ---------- */
@@ -329,11 +332,25 @@
                 const h = history.filter(x => x.date !== date).find(x => (x.exercises || []).some(e => e.name === name));
                 if (!h) return null;
                 const ex = h.exercises.find(e => e.name === name); if (!ex) return null;
-                if (ex.kind === 'checklist') return ex.done ? `Última vez: hecho · ${h.date}` : null;
-                if (ex.kind === 'timer') { const t = (ex.sets || []).map(s => fmt(Number(s.sec) || 0)).join(' · '); return t ? `Última vez: ${t} · ${h.date}` : null; }
-                if (ex.kind === 'cardio') { const c = ex.cardio || {}; return `Última vez: ${CARDIO_METHODS[c.method] || ''} ${c.km ? c.km + 'km ' : ''}${c.time ? c.time + 'min' : ''} · ${h.date}`; }
-                const parts = (ex.sets || []).filter(s => s.w || s.r).map(s => `${s.w ? '+' + s.w + 'kg ' : ''}${s.r || 0}r`);
-                return parts.length ? `Última vez: ${parts.join(' · ')}` : null;
+                const ds = h.date.slice(5); // MM-DD
+                if (ex.kind === 'checklist') return ex.done ? `Última ${ds}: hecho` : null;
+                if (ex.kind === 'timer') { const t = (ex.sets || []).map(s => fmt(Number(s.sec) || 0)).join(' · '); return t ? `Última ${ds}: ${t}` : null; }
+                if (ex.kind === 'cardio') { const c = ex.cardio || {}; const bits = [CARDIO_METHODS[c.method] || '', c.km && c.km + 'km', c.time && c.time + 'min', c.ppm && c.ppm + 'ppm', c.rounds && c.rounds + 'rnd'].filter(Boolean).join(' · '); return bits ? `Última ${ds}: ${bits}` : null; }
+                // weighted / reps: agrupar por peso preservando orden de aparición
+                const sets = (ex.sets || []).filter(s => (s.w !== '' && s.w !== undefined && s.w !== null) || (s.r !== '' && s.r !== undefined && s.r !== null));
+                if (!sets.length) return null;
+                const groups = [];
+                sets.forEach(s => {
+                    const hasW = s.w !== '' && s.w !== undefined && s.w !== null;
+                    const wNum = parseFloat(s.w);
+                    const key = hasW ? String(isNaN(wNum) ? s.w : wNum) : '__none__';
+                    const label = !hasW ? '' : (wNum === 0 ? '0kg' : `+${wNum}kg`);
+                    let g = groups.find(x => x.key === key);
+                    if (!g) { g = { key, label, reps: [] }; groups.push(g); }
+                    g.reps.push((s.r !== '' && s.r !== undefined && s.r !== null) ? String(s.r) : '0');
+                });
+                const lines = groups.map(g => `${g.label ? g.label + ' · ' : ''}${g.reps.join('+')}r`);
+                return `Última ${ds}:\n${lines.join('\n')}`;
             };
             const strat = useMemo(() => STRAT(profile.oneRM), [profile.oneRM]);
 
@@ -433,6 +450,8 @@
                 const pts = [];
                 if (m.src === 'weight' || m.src === 'fat') {
                     [...weightLog].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(w => { const v = parseFloat(m.src === 'weight' ? w.w : w.fat); if (v > 0) pts.push({ v }); });
+                } else if (m.src === 'wrist' || m.src === 'knee') {
+                    [...history].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => { pts.push({ v: Number((h.pain || {})[m.src]) || 0 }); });
                 } else {
                     [...history].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => {
                         const ex = (h.exercises || []).find(e => e.name === m.ex); if (!ex) return;
@@ -479,7 +498,7 @@
                 const last = lastPerf(ex.name);
                 return (<Card key={i} className="overflow-hidden fade-in">
                     <div className="px-4 py-3 flex items-center justify-between border-b border-white/[0.06]" style={{ background: theme.accent + '12' }}>
-                        <div className="min-w-0"><div className="font-bold text-sm truncate" style={{ color: theme.accent }}>{ex.name}</div>{last && <div className="text-[10px] text-slate-500 mt-0.5 truncate">{last}</div>}</div>
+                        <div className="min-w-0 flex-1"><div className="font-bold text-sm" style={{ color: theme.accent }}>{ex.name}</div>{last && <div className="text-[10px] text-slate-500 mt-0.5 whitespace-pre-line leading-snug">{last}</div>}</div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">{ex.video && <a href={ex.video} target="_blank" rel="noreferrer" className="text-slate-400 tap"><Ic d={I.play} s={20} /></a>}<button onClick={() => delExAt(i)} className="text-slate-600 tap"><Ic d={I.trash} s={17} /></button></div>
                     </div>
                     {ex.kind === 'cardio' ? <CardioBlock ex={ex} accent={theme.accent} onChange={u => updEx(i, () => u)} /> : (
@@ -557,12 +576,10 @@
                                     </Card>
                                 ) : <button onClick={() => setAdding(true)} className="w-full py-3 border border-dashed border-white/10 rounded-2xl text-sm font-bold text-slate-500 flex items-center justify-center gap-2 tap"><Ic d={I.plus} s={16} /> Añadir ejercicio</button>}
 
-                                {dayType !== 'light' && (
-                                    <Card className="overflow-hidden">
-                                        <button onClick={() => setCardioOpen(o => !o)} className="w-full px-4 py-3 flex items-center justify-between tap"><span className="font-bold text-sm flex items-center gap-2 text-slate-300"><Ic d={I.heart} s={16} /> Añadir cardio</span><span className="text-slate-500" style={{ transform: cardioOpen ? 'rotate(90deg)' : 'none', transition: '.2s' }}><Ic d={I.chev} s={18} /></span></button>
-                                        {cardioOpen && <div className="px-4 pb-4 grid grid-cols-2 gap-2 fade-in">{Object.keys(CARDIO_METHODS).map(m => <button key={m} onClick={() => addCardio(m)} className="py-3 rounded-xl text-xs font-bold border border-white/10 text-slate-300 tap">{CARDIO_METHODS[m]}</button>)}</div>}
-                                    </Card>
-                                )}
+                                <Card className="overflow-hidden">
+                                    <button onClick={() => setCardioOpen(o => !o)} className="w-full px-4 py-3 flex items-center justify-between tap"><span className="font-bold text-sm flex items-center gap-2 text-slate-300"><Ic d={I.heart} s={16} /> Añadir cardio</span><span className="text-slate-500" style={{ transform: cardioOpen ? 'rotate(90deg)' : 'none', transition: '.2s' }}><Ic d={I.chev} s={18} /></span></button>
+                                    {cardioOpen && <div className="px-4 pb-4 grid grid-cols-2 gap-2 fade-in">{Object.keys(CARDIO_METHODS).map(m => <button key={m} onClick={() => addCardio(m)} className="py-3 rounded-xl text-xs font-bold border border-white/10 text-slate-300 tap">{CARDIO_METHODS[m]}</button>)}</div>}
+                                </Card>
 
                                 <Card className="p-4 space-y-5">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Dolor articular</h3>
@@ -572,6 +589,18 @@
                                 </Card>
 
                                 <button onClick={save} className="w-full py-5 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2 tap" style={{ background: theme.accent, boxShadow: `0 10px 30px -10px ${theme.accent}` }}><Ic d={I.save} /> GUARDAR SESIÓN</button>
+                                {history.find(h => h.date === date) && (
+                                    <button onClick={() => {
+                                        const entry = history.find(h => h.date === date); if (!entry) return;
+                                        if (!confirm('¿Borrar la sesión guardada de este día?')) return;
+                                        const newHist = history.filter(x => x.id !== entry.id);
+                                        setHistory(newHist);
+                                        const sg = newHist.length ? ORDER[(ORDER.indexOf(newHist[0].dayType) + 1) % ORDER.length] : ORDER[0];
+                                        const ls = newHist.find(x => x.dayType === sg);
+                                        setSession({ dayType: sg, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null) });
+                                        ping('Sesión borrada');
+                                    }} className="w-full py-3 rounded-2xl font-bold text-xs text-rose-400/80 flex items-center justify-center gap-2 tap border border-rose-500/20"><Ic d={I.trash} s={14} /> Borrar sesión guardada</button>
+                                )}
                             </div>
                         )}
 
@@ -638,23 +667,16 @@
                                             const dd = h ? (DAYS[h.dayType] || DAYS.rest) : null;
                                             const wd = new Date(ds).toLocaleDateString('es', { weekday: 'short' });
                                             const isToday = ds === todayStr();
-                                            return (<div key={ds} onClick={() => h && setExpanded(expanded === h.id ? null : h.id)}
+                                            return (<div key={ds} onClick={() => { setDate(ds); setTab('today'); }}
                                                 className="rounded-2xl p-4 flex items-center justify-between tap border" style={h ? { background: dd.accent + '1F', borderColor: dd.accent + '55' } : { background: '#121826', borderColor: isToday ? '#ffffff22' : 'transparent' }}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 text-center"><div className="text-[10px] uppercase font-bold text-slate-500">{wd}</div><div className="font-black text-lg" style={h ? { color: dd.accent } : { color: '#475569' }}>{new Date(ds).getDate()}</div></div>
                                                     <div>{h ? (<><div className="font-bold text-sm" style={{ color: dd.accent }}>{dd.label}</div><div className="text-[10px] text-slate-500 font-bold">{(h.exercises || []).length} ej{(h.pain.wrist || h.pain.knee) ? ` · ✋${h.pain.wrist} 🦵${h.pain.knee}` : ''}{w ? ` · ${w.w}kg` : ''}</div></>) : (<div className="text-xs font-bold text-slate-600">{w ? `${w.w} kg registrado` : (isToday ? 'Hoy — sin registrar' : 'Sin entreno')}</div>)}</div>
                                                 </div>
-                                                {h && expanded === h.id && <Ic d={I.chev} s={16} c="#64748b" />}
+                                                <Ic d={I.chev} s={16} c="#475569" />
                                             </div>);
                                         })}
                                     </div>
-                                    {(() => { const h = history.find(x => x.id === expanded && weekDays.includes(x.date)); if (!h) return null; const dd = DAYS[h.dayType] || DAYS.rest;
-                                        return (<Card className="p-4 space-y-2 fade-in">
-                                            {(h.exercises || []).map((e, k) => { let det = e.kind === 'checklist' ? (e.done ? '✓ Completado' : '— No') : e.kind === 'timer' ? (e.sets || []).map(s => fmt(Number(s.sec) || 0)).join(' · ') : e.kind === 'cardio' ? `${CARDIO_METHODS[(e.cardio || {}).method] || ''}` : (e.sets || []).map(s => `${s.label ? s.label + ' ' : ''}${s.w ? '+' + s.w + 'kg ' : ''}${s.r || 0}r`).join('  ·  ');
-                                                return <div key={k} className="text-xs"><span className="font-bold" style={{ color: dd.accent }}>{e.name}</span> <span className="text-slate-400">{det}</span></div>; })}
-                                            {h.notes && <p className="text-xs text-slate-500 italic">“{h.notes}”</p>}
-                                            <button onClick={() => delEntry(h.id)} className="text-[11px] font-bold text-rose-500/80 flex items-center gap-1 tap"><Ic d={I.trash} s={13} /> Borrar</button>
-                                        </Card>); })()}
                                 </>)}
 
                                 {diaryView === 'month' && (<>
@@ -670,7 +692,7 @@
                                                 if (!ds) return <div key={i} />;
                                                 const h = history.find(x => x.date === ds); const w = weightLog.find(x => x.date === ds);
                                                 const dd = h ? (DAYS[h.dayType] || DAYS.rest) : null; const isToday = ds === todayStr();
-                                                return (<div key={i} onClick={() => h && (setDiaryView('week'), setExpanded(h.id))}
+                                                return (<div key={i} onClick={() => { setDate(ds); setTab('today'); }}
                                                     className="aspect-square rounded-lg flex items-center justify-center text-[11px] font-black tap"
                                                     style={h ? { background: dd.accent, color: '#fff' } : { background: w ? '#1E293B' : '#0F1521', color: '#475569', outline: isToday ? '1.5px solid #ffffff33' : 'none' }}>
                                                     {new Date(ds).getDate()}
