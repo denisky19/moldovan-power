@@ -289,6 +289,8 @@
             const [weekOff, setWeekOff] = useState(0);
             const [monOff, setMonOff] = useState(0);
             const [notif, setNotif] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+            const [lastBackup, setLastBackup] = useState(() => localStorage.getItem('mp2_lastbackup') || '');
+            const [hideBackupBanner, setHideBackupBanner] = useState(false);
             const fileRef = useRef(null);
 
             useEffect(() => localStorage.setItem('mp2_prof', JSON.stringify(profile)), [profile]);
@@ -359,6 +361,8 @@
                 return `Última ${ds}:\n${lines.join('\n')}`;
             };
             const strat = useMemo(() => STRAT(profile.oneRM), [profile.oneRM]);
+            const daysSinceBackup = lastBackup ? Math.floor((Date.now() - new Date(lastBackup).getTime()) / 86400000) : Infinity;
+            const needBackup = daysSinceBackup >= 14;
 
             const save = () => {
                 const entry = { id: Date.now(), date, dayType, bw: profile.bw, pain: { ...session.pain }, notes: session.notes, exercises: JSON.parse(JSON.stringify(session.exercises)) };
@@ -394,7 +398,8 @@
             const exportBackup = () => {
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(new Blob([JSON.stringify({ profile, history, weightLog, version: 'MP3' }, null, 2)], { type: 'application/json' }));
-                a.download = `MoldovanPower_backup_${todayStr()}.json`; a.click();
+                a.download = `${todayStr()}_MDPower.json`; a.click();
+                const t = todayStr(); localStorage.setItem('mp2_lastbackup', t); setLastBackup(t); ping('Copia descargada');
             };
             const importBackup = (e) => {
                 const f = e.target.files[0]; if (!f) return; const rd = new FileReader();
@@ -544,6 +549,17 @@
 
                         {tab === 'today' && (
                             <div className="space-y-4 pt-2">
+                                {needBackup && !hideBackupBanner && (
+                                    <div className="rounded-2xl p-3.5 flex items-center gap-3 fade-in" style={{ background: '#F59E0B1A', border: '1px solid #F59E0B55' }}>
+                                        <span style={{ color: '#F59E0B' }}><Ic d={I.save} s={20} /></span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-bold" style={{ color: '#FCD34D' }}>{lastBackup ? `Hace ${daysSinceBackup} días sin copia` : 'Aún no has hecho copia'}</div>
+                                            <div className="text-[10px] text-slate-400">Protege tus datos: exporta el JSON.</div>
+                                        </div>
+                                        <button onClick={exportBackup} className="px-3 py-2 rounded-xl text-xs font-black text-white tap shrink-0" style={{ background: '#F59E0B' }}>Exportar</button>
+                                        <button onClick={() => setHideBackupBanner(true)} className="text-slate-500 tap shrink-0 px-1 font-bold">✕</button>
+                                    </div>
+                                )}
                                 <Card className="p-2 flex items-center gap-2">
                                     <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent flex-1 font-bold px-2 outline-none" />
                                     <select value={dayType} onChange={e => changeDay(e.target.value)} className="bg-transparent font-black uppercase text-sm text-right outline-none px-2" style={{ color: theme.accent }}>{ORDER.map(k => <option key={k} value={k}>{DAYS[k].label}</option>)}</select>
@@ -729,6 +745,7 @@
                                 </Card>
                                 <Card className="p-5 space-y-4">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Copia de seguridad</h3>
+                                    <p className="text-[10px] text-slate-500">{lastBackup ? `Última copia: ${lastBackup} (hace ${daysSinceBackup} días).` : 'Aún no has hecho ninguna copia.'} La app te avisa a los 14 días. Se guarda en Descargas con nombre fecha_MDPower.json.</p>
                                     <button onClick={exportBackup} className="w-full bg-[#0B0F19] border border-white/[0.06] py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 tap"><Ic d={I.save} s={18} /> Descargar copia (JSON)</button>
                                     <input type="file" ref={fileRef} onChange={importBackup} className="hidden" accept=".json" />
                                     <button onClick={() => fileRef.current.click()} className="w-full border border-white/10 py-3.5 rounded-xl font-bold text-sm text-slate-400 flex items-center justify-center gap-2 tap"><Ic d={I.up} s={18} /> Restaurar copia (JSON)</button>
