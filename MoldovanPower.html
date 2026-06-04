@@ -132,8 +132,8 @@
         const todayStr = () => dstr(new Date());
         const r05 = (v) => Math.round(v * 2) / 2;
         const STRAT = (rm) => { const m = Number(rm) || 0; return { cal2: r05(m * 0.60), cal3: r05(m * 0.80), s1: r05(m * 0.75), s2: r05(m * 0.75 * 0.80) }; };
-        const seed = (t, rm, prevEx) => {
-            const ex = JSON.parse(JSON.stringify(TEMPLATES[t] || []));
+        const seed = (t, rm, prevEx, base) => {
+            const ex = JSON.parse(JSON.stringify(base || TEMPLATES[t] || []));
             if (t === 'pull') {
                 const s = STRAT(rm);
                 const d = ex.find(e => e.name === 'Dominadas lastradas');
@@ -159,6 +159,9 @@
             return ex;
         };
         const CARDIO_METHODS = { walk: 'Caminar', elliptical: 'Elíptica', bike: 'Bici', hiit: 'HIIT' };
+        const KINDS = { weighted: 'Peso + reps', reps: 'Solo reps', timer: 'Temporizador', checklist: 'Checklist', cardio: 'Cardio' };
+        const shapeFor = (kind) => kind === 'checklist' ? { done: false } : kind === 'cardio' ? { cardio: { method: 'walk', km: '', time: '', ppm: '', rounds: '' } } : kind === 'timer' ? { sets: [{ sec: 60, done: false }] } : { sets: [{ w: '', r: '' }] };
+        const loadTemplates = () => { try { return JSON.parse(localStorage.getItem('mp2_templates')) || {}; } catch { return {}; } };
 
         /* ---------- MIGRACIÓN ---------- */
         const normEntry = (e) => {
@@ -274,6 +277,9 @@
             const [profile, setProfile] = useState(loadProfile);
             const [history, setHistory] = useState(loadHistory);
             const [weightLog, setWeightLog] = useState(loadWeight);
+            const [templates, setTemplates] = useState(loadTemplates);
+            const [editDay, setEditDay] = useState('pull');
+            const [editList, setEditList] = useState(null);
             const [tab, setTab] = useState('today');
             const [date, setDate] = useState(todayStr());
             const [session, setSession] = useState({ dayType: null, pain: { wrist: 0, knee: 0 }, notes: '', exercises: [] });
@@ -297,6 +303,17 @@
             useEffect(() => localStorage.setItem('mp2_hist', JSON.stringify(history)), [history]);
             useEffect(() => localStorage.setItem('mp2_weight', JSON.stringify(weightLog)), [weightLog]);
             useEffect(() => localStorage.setItem('mp2_charts', JSON.stringify(charts)), [charts]);
+            useEffect(() => localStorage.setItem('mp2_templates', JSON.stringify(templates)), [templates]);
+            const baseFor = (t) => (Object.prototype.hasOwnProperty.call(templates, t) ? templates[t] : TEMPLATES[t]) || [];
+            // ---- Editor de plantillas ----
+            const startEdit = (t) => { setEditDay(t); setEditList(JSON.parse(JSON.stringify(baseFor(t)))); };
+            const editUpd = (k, fn) => setEditList(l => l.map((e, i) => i === k ? fn({ ...e }) : e));
+            const editMove = (k, dir) => setEditList(l => { const n = [...l]; const j = k + dir; if (j < 0 || j >= n.length) return l; [n[k], n[j]] = [n[j], n[k]]; return n; });
+            const editDel = (k) => setEditList(l => l.filter((_, i) => i !== k));
+            const editAdd = () => setEditList(l => [...l, { name: 'Nuevo ejercicio', kind: 'weighted', ...shapeFor('weighted') }]);
+            const editKind = (k, kind) => editUpd(k, e => ({ name: e.name, video: e.video, note: e.note, kind, ...shapeFor(kind) }));
+            const saveEdit = () => { const clean = (editList || []).filter(e => (e.name || '').trim()); setTemplates(t => ({ ...t, [editDay]: clean })); setEditList(null); ping(`Plantilla "${DAYS[editDay].label}" guardada`); };
+            const resetTemplates = () => { const a = prompt('Esto borra TODAS tus plantillas personalizadas y vuelve a la base original. Escribe RESET para confirmar:'); if (a === 'RESET') { setTemplates({}); localStorage.removeItem('mp2_templates'); setEditList(null); ping('Plantillas restablecidas a base'); } };
             const ping = (m) => { setToast(m); setTimeout(() => setToast(''), 2400); };
 
             const activeDates = useMemo(() => new Set([...history.map(h => h.date), ...weightLog.map(w => w.date)]), [history, weightLog]);
@@ -332,10 +349,10 @@
             useEffect(() => {
                 const saved = history.find(h => h.date === date);
                 if (saved) setSession({ dayType: saved.dayType, pain: { ...saved.pain }, notes: saved.notes, exercises: JSON.parse(JSON.stringify(saved.exercises)) });
-                else setSession({ dayType: suggestType, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(suggestType, profile.oneRM, lastSame(suggestType)) });
+                else setSession({ dayType: suggestType, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(suggestType, profile.oneRM, lastSame(suggestType), baseFor(suggestType)) });
             }, [date]);
 
-            const changeDay = (t) => setSession(s => ({ ...s, dayType: t, exercises: seed(t, profile.oneRM, lastSame(t)) }));
+            const changeDay = (t) => setSession(s => ({ ...s, dayType: t, exercises: seed(t, profile.oneRM, lastSame(t), baseFor(t)) }));
             const lastPerf = (name) => {
                 const h = history.filter(x => x.date !== date).find(x => (x.exercises || []).some(e => e.name === name));
                 if (!h) return null;
@@ -619,7 +636,7 @@
                                         setHistory(newHist);
                                         const sg = newHist.length ? ORDER[(ORDER.indexOf(newHist[0].dayType) + 1) % ORDER.length] : ORDER[0];
                                         const ls = newHist.find(x => x.dayType === sg);
-                                        setSession({ dayType: sg, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null) });
+                                        setSession({ dayType: sg, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null, baseFor(sg)) });
                                         ping('Sesión borrada');
                                     }} className="w-full py-3 rounded-2xl font-bold text-xs text-rose-400/80 flex items-center justify-center gap-2 tap border border-rose-500/20"><Ic d={I.trash} s={14} /> Borrar sesión guardada</button>
                                 )}
@@ -738,6 +755,44 @@
                                     </div>
                                     <p className="text-[10px] text-slate-500">Estrategia 2-set: Cal.1 sin peso 5r · Cal.2 60% 3r · Cal.3 80% 1-2r · S1 75% · S2 60%. “Toca” avanza al siguiente día tras el último guardado.</p>
                                 </Card>
+
+                                <Card className="p-5 space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Editor de días</h3>
+                                    <p className="text-[10px] text-slate-500">Personaliza los ejercicios por defecto de cada día. Afecta a los días nuevos que abras (no cambia sesiones ya guardadas).</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {ORDER.map(k => <button key={k} onClick={() => startEdit(k)} className="py-2.5 rounded-xl text-xs font-bold tap border flex items-center justify-center gap-1.5" style={editList && editDay === k ? { background: DAYS[k].accent, borderColor: DAYS[k].accent, color: '#fff' } : { borderColor: '#ffffff14', color: '#94a3b8' }}><span className="w-2 h-2 rounded-full" style={{ background: editList && editDay === k ? '#fff' : DAYS[k].accent }} />{DAYS[k].label}{Object.prototype.hasOwnProperty.call(templates, k) ? ' *' : ''}</button>)}
+                                    </div>
+                                    {Object.keys(templates).length > 0 && <p className="text-[9px] text-slate-600">* = día personalizado.</p>}
+
+                                    {editList && (<div className="space-y-2.5 pt-1 fade-in">
+                                        <div className="text-[11px] font-black uppercase tracking-widest pt-1" style={{ color: DAYS[editDay].accent }}>{DAYS[editDay].label}</div>
+                                        {editList.length === 0 && <p className="text-[11px] text-slate-500 bg-white/[0.03] rounded-xl p-3 text-center">Día vacío. Añade ejercicios o guárdalo así (día de descanso).</p>}
+                                        {editList.map((e, k) => (
+                                            <div key={k} className="bg-[#0B0F19] rounded-2xl p-3 border border-white/[0.06] space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <input value={e.name} onChange={ev => editUpd(k, x => ({ ...x, name: ev.target.value }))} placeholder="Nombre" className="flex-1 bg-[#121826] rounded-lg px-3 py-2 font-bold text-sm outline-none border border-white/[0.06]" />
+                                                    <div className="flex flex-col">
+                                                        <button onClick={() => editMove(k, -1)} disabled={k === 0} className="tap px-1.5 text-slate-400 disabled:opacity-20" style={{ transform: 'rotate(-90deg)' }}><Ic d={I.chev} s={16} /></button>
+                                                        <button onClick={() => editMove(k, 1)} disabled={k === editList.length - 1} className="tap px-1.5 text-slate-400 disabled:opacity-20" style={{ transform: 'rotate(90deg)' }}><Ic d={I.chev} s={16} /></button>
+                                                    </div>
+                                                    <button onClick={() => editDel(k)} className="tap text-slate-600 px-1"><Ic d={I.trash} s={16} /></button>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <select value={e.kind} onChange={ev => editKind(k, ev.target.value)} className="bg-[#121826] rounded-lg px-2 py-2 text-xs font-bold outline-none border border-white/[0.06]">{Object.keys(KINDS).map(kk => <option key={kk} value={kk}>{KINDS[kk]}</option>)}</select>
+                                                    <input value={e.video || ''} onChange={ev => editUpd(k, x => ({ ...x, video: ev.target.value }))} placeholder="URL vídeo (opcional)" className="flex-1 bg-[#121826] rounded-lg px-3 py-2 text-xs outline-none border border-white/[0.06]" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <button onClick={editAdd} className="w-full py-2.5 border border-dashed border-white/10 rounded-xl text-xs font-bold text-slate-500 flex items-center justify-center gap-1 tap"><Ic d={I.plus} s={14} /> Añadir ejercicio</button>
+                                        <div className="flex gap-2 pt-1">
+                                            <button onClick={() => setEditList(null)} className="flex-1 py-3 rounded-xl border border-white/10 font-bold text-sm text-slate-400 tap">Cancelar</button>
+                                            <button onClick={saveEdit} className="flex-1 py-3 rounded-xl font-black text-sm text-white tap" style={{ background: DAYS[editDay].accent }}>Guardar día</button>
+                                        </div>
+                                    </div>)}
+
+                                    <button onClick={resetTemplates} className="w-full mt-1 py-2.5 rounded-xl text-[11px] font-bold text-rose-500/70 border border-rose-500/15 tap">Restablecer todo a la base original…</button>
+                                </Card>
+
                                 <Card className="p-5 space-y-3">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recordatorio</h3>
                                     <button onClick={reqNotif} className="w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 tap" style={notif === 'granted' ? { background: theme.accent, color: '#fff' } : { background: '#0B0F19', border: '1px solid #ffffff14', color: '#94a3b8' }}><Ic d={I.bell} s={18} /> {notif === 'granted' ? 'Recordatorio activado (19:30)' : notif === 'unsupported' ? 'No soportado en este navegador' : 'Activar recordatorio 19:30'}</button>
