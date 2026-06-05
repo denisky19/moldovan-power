@@ -76,6 +76,7 @@
             heart:<><path d="M19 14c1.5-1.5 3-3.2 3-5.5A4.5 4.5 0 0 0 12 6 4.5 4.5 0 0 0 2 8.5C2 13 12 21 12 21z"/></>,
             flame:<><path d="M12 2c1 4-2 5-2 8a3 3 0 0 0 6 0c0-1-.5-2-1-2.5C16 10 19 13 19 16a7 7 0 0 1-14 0c0-5 5-7 7-14z"/></>,
             bell:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></>,
+            clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></>,
             arrow:<><path d="M5 12h14M13 6l6 6-6 6"/></>,
         };
 
@@ -260,6 +261,30 @@
             </div>);
         };
 
+        const RestTimer = ({ accent, seconds = 90, onClose }) => {
+            const [rem, setRem] = useState(seconds);
+            const iv = useRef(null);
+            const run = () => {
+                resumeAudio(); let cur = seconds; setRem(cur); clearInterval(iv.current);
+                iv.current = setInterval(() => {
+                    cur -= 1;
+                    if (cur <= 3 && cur > 0) beep(760, 130);
+                    if (cur <= 0) { beep(1020, 540); clearInterval(iv.current); setRem(0); return; }
+                    setRem(cur);
+                }, 1000);
+            };
+            useEffect(() => { run(); return () => clearInterval(iv.current); }, []);
+            const done = rem <= 0;
+            return (<div className="rounded-xl p-3 flex items-center justify-between border fade-in" style={{ background: accent + '14', borderColor: accent + '55' }}>
+                <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: accent }}>Descanso</span>
+                <div className="text-2xl font-black tabular-nums" style={{ color: done ? '#10B981' : accent }}>{done ? '¡Ya!' : fmt(rem)}</div>
+                <div className="flex items-center gap-3">
+                    <button onClick={run} className="tap text-slate-400 p-1"><Ic d={I.reload} s={16} /></button>
+                    <button onClick={onClose} className="tap text-slate-500 font-black px-1 text-lg leading-none">✕</button>
+                </div>
+            </div>);
+        };
+
         const CardioBlock = ({ ex, accent, onChange }) => {
             const c = ex.cardio || { method: 'walk' };
             const set = (k, v) => onChange({ ...ex, cardio: { ...c, [k]: v } });
@@ -280,6 +305,8 @@
             const [templates, setTemplates] = useState(loadTemplates);
             const [editDay, setEditDay] = useState('pull');
             const [editList, setEditList] = useState(null);
+            const [restAt, setRestAt] = useState(null);
+            const [restNonce, setRestNonce] = useState(0);
             const [tab, setTab] = useState('today');
             const [date, setDate] = useState(todayStr());
             const [session, setSession] = useState({ dayType: null, pain: { wrist: 0, knee: 0 }, notes: '', exercises: [] });
@@ -527,7 +554,7 @@
                 return (<Card key={i} className="overflow-hidden fade-in">
                     <div className="px-4 py-3 flex items-center justify-between border-b border-white/[0.06]" style={{ background: theme.accent + '12' }}>
                         <div className="min-w-0 flex-1"><div className="font-bold text-sm" style={{ color: theme.accent }}>{ex.name}</div>{last && <div className="text-[10px] text-slate-500 mt-0.5 whitespace-pre-line leading-snug">{last}</div>}</div>
-                        <div className="flex items-center gap-3 shrink-0 ml-2">{ex.video && <a href={ex.video} target="_blank" rel="noreferrer" className="text-slate-400 tap"><Ic d={I.play} s={20} /></a>}<button onClick={() => delExAt(i)} className="text-slate-600 tap"><Ic d={I.trash} s={17} /></button></div>
+                        <div className="flex items-center gap-3 shrink-0 ml-2">{dayType === 'light' && ex.kind !== 'cardio' && <button onClick={() => { setRestAt(i); setRestNonce(n => n + 1); }} className="tap flex items-center gap-1 text-[11px] font-black px-2 py-1 rounded-lg" style={{ color: theme.accent, background: theme.accent + '1F' }}><Ic d={I.clock} s={15} /> 90s</button>}{ex.video && <a href={ex.video} target="_blank" rel="noreferrer" className="text-slate-400 tap"><Ic d={I.play} s={20} /></a>}<button onClick={() => delExAt(i)} className="text-slate-600 tap"><Ic d={I.trash} s={17} /></button></div>
                     </div>
                     {ex.kind === 'cardio' ? <CardioBlock ex={ex} accent={theme.accent} onChange={u => updEx(i, () => u)} /> : (
                         <div className="p-4 space-y-3">
@@ -540,6 +567,7 @@
                             {(ex.kind === 'weighted' || ex.kind === 'reps') && SetRows(ex, i)}
                         </div>
                     )}
+                    {dayType === 'light' && restAt === i && <div className="px-4 pb-4"><RestTimer key={restNonce} accent={theme.accent} seconds={90} onClose={() => setRestAt(null)} /></div>}
                 </Card>);
             };
 
