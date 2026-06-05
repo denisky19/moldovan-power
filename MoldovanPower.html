@@ -244,9 +244,9 @@
                 <div className="flex items-center justify-between">
                     {run ? <div className="text-3xl font-black tabular-nums" style={{ color: accent }}>{fmt(rem)}</div> : (
                         <div className="flex items-center gap-1">
-                            <input type="number" inputMode="numeric" value={mins} onChange={e => onChange({ ...st, sec: Math.max(0, (Number(e.target.value) || 0) * 60 + secs) })} className="bg-[#121826] w-14 text-center rounded-lg p-2 font-black outline-none" />
+                            <input type="number" inputMode="numeric" placeholder="0" value={mins || ''} onChange={e => onChange({ ...st, sec: Math.max(0, (Number(e.target.value) || 0) * 60 + secs) })} className="bg-[#121826] w-14 text-center rounded-lg p-2 font-black outline-none" />
                             <span className="font-black text-slate-500">:</span>
-                            <input type="number" inputMode="numeric" value={secs} onChange={e => onChange({ ...st, sec: Math.max(0, mins * 60 + Math.min(59, Number(e.target.value) || 0)) })} className="bg-[#121826] w-14 text-center rounded-lg p-2 font-black outline-none" />
+                            <input type="number" inputMode="numeric" placeholder="0" value={secs || ''} onChange={e => onChange({ ...st, sec: Math.max(0, mins * 60 + Math.min(59, Number(e.target.value) || 0)) })} className="bg-[#121826] w-14 text-center rounded-lg p-2 font-black outline-none" />
                             <span className="text-[10px] text-slate-500 font-bold ml-1">min : seg</span>
                         </div>
                     )}
