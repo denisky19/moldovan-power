@@ -392,6 +392,25 @@
         const loadHistory = () => { const raw = localStorage.getItem('mp2_hist') || localStorage.getItem('mp_hist'); if (!raw) return []; try { return (JSON.parse(raw) || []).map(normEntry).filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date)); } catch { return []; } };
         const loadWeight = () => { try { return (JSON.parse(localStorage.getItem('mp2_weight') || '[]') || []).filter(x => x && x.date).sort((a, b) => new Date(b.date) - new Date(a.date)); } catch { return []; } };
 
+        /* ---------- AUTOGUARDADO ---------- */
+        // Borrador por fecha: se escribe en cada cambio, así nada se pierde si se cierra la app.
+        const DRAFT_KEY = 'mp2_drafts';
+        const loadDrafts = () => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)) || {}; } catch { return {}; } };
+        const writeDraft = (sess) => {
+            try {
+                const d = loadDrafts(); d[sess.date] = { ...sess, ts: Date.now() };
+                const cut = Date.now() - 21 * 86400000; Object.keys(d).forEach(k => { if ((d[k].ts || 0) < cut) delete d[k]; });
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+            } catch (e) {}
+        };
+        const dropDraft = (date) => { try { const d = loadDrafts(); delete d[date]; localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e) {} };
+        // ¿Hay entreno real apuntado? (no cuenta lo que viene pre-rellenado)
+        const hasContent = (sess) => !!(sess.notes || '').trim() || (sess.exercises || []).some(e =>
+            e.kind === 'checklist' ? !!e.done
+            : e.kind === 'cardio' ? ['time', 'km', 'ppm', 'rounds'].some(k => (e.cardio || {})[k])
+            : e.kind === 'timer' ? (e.sets || []).some(x => x.done)
+            : (e.sets || []).some(x => !isWarmSet(x) && x.r !== '' && x.r != null));
+
         const METRICS = {
             weight:      { label: 'Peso corporal', unit: ' kg', src: 'weight' },
             fat:         { label: '% Grasa (báscula)', unit: ' %', src: 'fat' },
@@ -411,11 +430,39 @@
 
         /* ---------- UI BASE ---------- */
         const Card = ({ children, className = '' }) => (<div className={`bg-[#121826] border border-white/[0.06] rounded-3xl ${className}`}>{children}</div>);
+        // Slider propio: solo se mueve arrastrando la bolita en horizontal. Un toque en la barra
+        // (o en la bolita sin arrastrar) no cambia nada, y deslizar en vertical sigue haciendo scroll.
         const PainSlider = ({ label, value, onChange }) => {
-            const col = value >= 4 ? '#F43F5E' : value >= 2 ? '#F59E0B' : '#10B981';
-            return (<div className="space-y-2">
-                <div className="flex justify-between items-center"><span className="text-xs font-semibold text-slate-400">{label}</span><span className="text-sm font-extrabold" style={{ color: col }}>{value}/10</span></div>
-                <input type="range" min="0" max="10" value={value} onChange={e => onChange(Number(e.target.value))} className="w-full" style={{ '--thumb': col }} />
+            const col = value >= 5 ? '#F43F5E' : value >= 3 ? '#F59E0B' : '#10B981';
+            const track = useRef(null);
+            const drag = useRef(null);
+            const pct = value * 10;
+            const down = (e) => { drag.current = { x: e.clientX, v: value, on: false }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} };
+            const move = (e) => {
+                const d = drag.current; if (!d || !track.current) return;
+                const dx = e.clientX - d.x;
+                if (!d.on && Math.abs(dx) < 6) return; // umbral: un toque no mueve
+                d.on = true;
+                const step = track.current.getBoundingClientRect().width / 10;
+                const v = Math.max(0, Math.min(10, Math.round(d.v + dx / step)));
+                if (v !== value) onChange(v);
+            };
+            const up = () => { drag.current = null; };
+            const key = (e) => {
+                const k = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 }[e.key];
+                if (k) { e.preventDefault(); onChange(Math.max(0, Math.min(10, value + k))); }
+            };
+            return (<div className="space-y-1">
+                <div className="flex justify-between items-center"><span className="text-xs font-semibold text-slate-400">{label}</span><span className="text-sm font-extrabold tabular-nums" style={{ color: col }}>{value}/10</span></div>
+                <div ref={track} className="relative h-9 mx-3 flex items-center select-none">
+                    <div className="h-2 w-full rounded-full bg-[#1E293B] overflow-hidden"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: col }} /></div>
+                    <div role="slider" tabIndex={0} aria-label={label} aria-valuemin={0} aria-valuemax={10} aria-valuenow={value}
+                        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up} onKeyDown={key}
+                        className="absolute top-1/2 w-11 h-11 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-grab active:cursor-grabbing outline-none"
+                        style={{ left: `${pct}%`, touchAction: 'pan-y' }}>
+                        <div className="w-6 h-6 rounded-full bg-white shadow-lg" style={{ border: `4px solid ${col}` }} />
+                    </div>
+                </div>
             </div>);
         };
         const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`;
@@ -530,7 +577,8 @@
             const [restNonce, setRestNonce] = useState(0);
             const [tab, setTab] = useState('today');
             const [date, setDate] = useState(todayStr());
-            const [session, setSession] = useState({ dayType: null, pain: emptyPain(), painSet: false, notes: '', exercises: [] });
+            const [session, setSession] = useState({ date: null, dayType: null, pain: emptyPain(), painSet: false, notes: '', exercises: [] });
+            const [autoAt, setAutoAt] = useState('');
             const [toast, setToast] = useState('');
             const [expanded, setExpanded] = useState(null);
             const [adding, setAdding] = useState(false);
@@ -539,7 +587,7 @@
             const [painOpen, setPainOpen] = useState(false);
             const [charts, setCharts] = useState(() => { try { return (JSON.parse(localStorage.getItem('mp2_charts')) || ['pain_knee', 'latpull', 'weight']).map(k => METRIC_ALIAS[k] || k); } catch { return ['pain_knee', 'latpull', 'weight']; } });
             const [range, setRange] = useState(90);
-            const [wForm, setWForm] = useState({ date: todayStr(), w: '', fat: '' });
+            const [wForm, setWForm] = useState(() => { try { const f = JSON.parse(localStorage.getItem('mp2_wform')); if (f && f.date === todayStr()) return f; } catch (e) {} return { date: todayStr(), w: '', fat: '' }; });
             const [diaryView, setDiaryView] = useState('week');
             const [weekOff, setWeekOff] = useState(0);
             const [monOff, setMonOff] = useState(0);
@@ -553,6 +601,7 @@
             useEffect(() => localStorage.setItem('mp2_weight', JSON.stringify(weightLog)), [weightLog]);
             useEffect(() => localStorage.setItem('mp2_charts', JSON.stringify(charts)), [charts]);
             useEffect(() => localStorage.setItem('mp2_templates', JSON.stringify(templates)), [templates]);
+            useEffect(() => { try { localStorage.setItem('mp2_wform', JSON.stringify(wForm)); } catch (e) {} }, [wForm]);
             const baseFor = (t) => (Object.prototype.hasOwnProperty.call(templates, t) ? templates[t] : TEMPLATES[t]) || [];
             // ---- Editor de plantillas ----
             const startEdit = (t) => { setEditDay(t); setEditList(JSON.parse(JSON.stringify(baseFor(t)))); };
@@ -596,11 +645,17 @@
 
             const lastSame = (t) => { const h = history.find(x => x.dayType === t && x.date !== date); return h ? h.exercises : null; };
 
-            useEffect(() => {
-                const saved = history.find(h => h.date === date);
-                if (saved) setSession({ dayType: saved.dayType, pain: normPain(saved.pain), painSet: saved.painSet ?? true, notes: saved.notes, exercises: JSON.parse(JSON.stringify(saved.exercises)) });
-                else setSession({ dayType: suggestType, pain: emptyPain(), painSet: false, notes: '', exercises: seed(suggestType, profile.oneRM, lastSame(suggestType), baseFor(suggestType)) });
-            }, [date]);
+            // Abre un día: borrador (lo último que escribiste) > sesión guardada > plantilla del día que toca.
+            const loadDay = (d, hist, useDraft = true) => {
+                const draft = useDraft ? loadDrafts()[d] : null;
+                const saved = hist.find(h => h.date === d);
+                if (draft && draft.dayType && Array.isArray(draft.exercises)) return { date: d, dayType: draft.dayType, pain: normPain(draft.pain), painSet: !!draft.painSet, notes: draft.notes || '', exercises: draft.exercises };
+                if (saved) return { date: d, dayType: saved.dayType, pain: normPain(saved.pain), painSet: saved.painSet ?? true, notes: saved.notes, exercises: JSON.parse(JSON.stringify(saved.exercises)) };
+                const sg = hist.length ? nextAfter(hist[0].dayType) : ORDER[0];
+                const ls = hist.find(x => x.dayType === sg && x.date !== d);
+                return { date: d, dayType: sg, pain: emptyPain(), painSet: false, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null, baseFor(sg)) };
+            };
+            useEffect(() => { setSession(loadDay(date, history)); }, [date]);
 
             const changeDay = (t) => setSession(s => ({ ...s, dayType: t, exercises: seed(t, profile.oneRM, lastSame(t), baseFor(t)) }));
             const lastPerf = (name) => {
@@ -662,11 +717,34 @@
             };
             const okName = (name) => { const why = blacklisted(name); return !why || confirm(`"${name}" está en tu lista negra (${why}). ¿Añadirlo igualmente?`); };
 
-            const save = () => {
-                const entry = { id: Date.now(), date, dayType, bw: profile.bw, pain: { ...session.pain }, painSet: session.painSet, notes: session.notes, exercises: JSON.parse(JSON.stringify(session.exercises)) };
-                setHistory(h => [entry, ...h.filter(x => x.date !== date)].sort((a, b) => new Date(b.date) - new Date(a.date)));
-                ping('Sesión guardada');
+            // Escribe la sesión en el historial al momento (también en localStorage, por si la app se cierra justo después).
+            const histRef = useRef(history); histRef.current = history;
+            const sessRef = useRef(session); sessRef.current = session;
+            const commitTimer = useRef(null);
+            const commit = (s) => {
+                if (!s || !s.date || !s.dayType) return;
+                const h = histRef.current; const prev = h.find(x => x.date === s.date);
+                const entry = { id: prev?.id || Date.now(), date: s.date, dayType: s.dayType, bw: profile.bw, pain: { ...s.pain }, painSet: s.painSet, notes: s.notes, exercises: JSON.parse(JSON.stringify(s.exercises)) };
+                const next = [entry, ...h.filter(x => x.date !== s.date)].sort((a, b) => new Date(b.date) - new Date(a.date));
+                histRef.current = next;
+                try { localStorage.setItem('mp2_hist', JSON.stringify(next)); } catch (e) {}
+                setHistory(next);
+                setAutoAt(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
             };
+            const autoCommit = () => { const s = sessRef.current; if (s && s.date && s.dayType && (histRef.current.some(x => x.date === s.date) || hasContent(s))) commit(s); };
+            // Cada cambio: borrador al instante y sesión al historial a los 0,7 s (o al salir de la app).
+            useEffect(() => {
+                if (!session.date || !session.dayType) return;
+                writeDraft(session);
+                clearTimeout(commitTimer.current);
+                commitTimer.current = setTimeout(autoCommit, 700);
+            }, [session]);
+            useEffect(() => {
+                const flush = (e) => { if (e.type === 'pagehide' || document.visibilityState === 'hidden') { clearTimeout(commitTimer.current); const s = sessRef.current; if (s && s.date && s.dayType) writeDraft(s); autoCommit(); } };
+                document.addEventListener('visibilitychange', flush); window.addEventListener('pagehide', flush);
+                return () => { document.removeEventListener('visibilitychange', flush); window.removeEventListener('pagehide', flush); };
+            }, []);
+            const save = () => { clearTimeout(commitTimer.current); commit(session); ping('Sesión guardada'); };
             const delEntry = (id) => { if (confirm('¿Borrar esta sesión?')) setHistory(h => h.filter(x => x.id !== id)); };
             const updEx = (i, fn) => setSession(s => ({ ...s, exercises: s.exercises.map((e, k) => k === i ? fn(JSON.parse(JSON.stringify(e))) : e) }));
             const delExAt = (i) => setSession(s => ({ ...s, exercises: s.exercises.filter((_, k) => k !== i) }));
@@ -709,7 +787,7 @@
                             const wl = (d.weightLog || []).filter(x => x && x.date).sort((a, b) => new Date(b.date) - new Date(a.date));
                             if (confirm(`¿Restaurar ${hist.length} sesiones y ${wl.length} pesos? Reemplaza los datos actuales.`)) {
                                 if (d.profile) setProfile(profileFrom(d.profile));
-                                setHistory(hist); setWeightLog(wl); ping('Datos restaurados');
+                                clearTimeout(commitTimer.current); localStorage.removeItem(DRAFT_KEY); histRef.current = hist; setHistory(hist); setWeightLog(wl); setSession(loadDay(date, hist, false)); ping('Datos restaurados');
                             }
                         } else ping('Archivo no válido');
                     } catch { ping('Error al leer el archivo'); }
@@ -951,15 +1029,17 @@
                                 </Card>
 
                                 <button onClick={save} className="w-full py-5 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2 tap" style={{ background: theme.accent, boxShadow: `0 10px 30px -10px ${theme.accent}` }}><Ic d={I.save} /> GUARDAR SESIÓN</button>
+                                <p className="text-center text-[10px] font-bold text-slate-500 -mt-1">{history.some(h => h.date === date) ? `✓ Guardado automáticamente${autoAt ? ` · ${autoAt}` : ''}` : 'Se guarda solo en cuanto apuntes series, tiempos, cardio o notas.'}</p>
                                 {history.find(h => h.date === date) && (
                                     <button onClick={() => {
                                         const entry = history.find(h => h.date === date); if (!entry) return;
                                         if (!confirm('¿Borrar la sesión guardada de este día?')) return;
                                         const newHist = history.filter(x => x.id !== entry.id);
-                                        setHistory(newHist);
+                                        clearTimeout(commitTimer.current); histRef.current = newHist; dropDraft(date);
+                                        setHistory(newHist); setAutoAt('');
                                         const sg = newHist.length ? nextAfter(newHist[0].dayType) : ORDER[0];
                                         const ls = newHist.find(x => x.dayType === sg);
-                                        setSession({ dayType: sg, pain: emptyPain(), painSet: false, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null, baseFor(sg)) });
+                                        setSession({ date, dayType: sg, pain: emptyPain(), painSet: false, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null, baseFor(sg)) });
                                         ping('Sesión borrada');
                                     }} className="w-full py-3 rounded-2xl font-bold text-xs text-rose-400/80 flex items-center justify-center gap-2 tap border border-rose-500/20"><Ic d={I.trash} s={14} /> Borrar sesión guardada</button>
                                 )}
