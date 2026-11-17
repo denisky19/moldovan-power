@@ -1,4 +1,4 @@
-const CACHE = 'mp-v1';
+const CACHE = 'mp-v2';
 const ASSETS = [
   './MoldovanPower.html',
   './manifest.webmanifest',

@@ -2,7 +2,7 @@
   "id": "/moldovan-power/",
   "name": "Moldovan Power",
   "short_name": "Moldovan",
-  "description": "Seguimiento de entrenamiento en readaptación: ciclo 7 días, método 2-set, peso, progreso y diario.",
+  "description": "Seguimiento de gimnasio para postura y readaptación: 6 días con calentamientos, vídeos, temporizadores, semáforo de dolor, progreso y diario.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

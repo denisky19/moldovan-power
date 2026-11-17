@@ -78,74 +78,280 @@
             bell:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></>,
             clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></>,
             arrow:<><path d="M5 12h14M13 6l6 6-6 6"/></>,
+            book:<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></>,
         };
 
         /* ---------- CONFIG ---------- */
-        const ORDER = ['pull', 'legs', 'mobility', 'push', 'core', 'light', 'rest'];
+        // Programa "Postura + Rehab" (informe técnico-clínico, nov 2026). 5 días fuerza + 1 día postura/core/cardio + descanso.
+        const ORDER = ['back', 'quads', 'chest', 'hams', 'shoulders', 'posture', 'rest'];
         const DAYS = {
-            pull:     { label: 'Tracción',         short: 'Trac', sub: 'Tren superior · tracción + escápula', accent: '#10B981' },
-            legs:     { label: 'Cadena posterior', short: 'C.Post', sub: 'Unilateral · glúteo e isquios',     accent: '#3B82F6' },
-            mobility: { label: 'Movilidad / Pies', short: 'Movil', sub: 'Pies, columna y movilidad',          accent: '#F59E0B' },
-            push:     { label: 'Empuje',           short: 'Push', sub: 'Dips',                                 accent: '#F43F5E' },
-            core:     { label: 'Core',             short: 'Core', sub: 'Isometrías por tiempo',               accent: '#8B5CF6' },
-            light:    { label: 'Kettlebell',       short: 'Kettle', sub: 'Entreno con kettlebell',           accent: '#14B8A6' },
-            rest:     { label: 'Descanso',         short: 'Rest', sub: 'Recuperación',                        accent: '#64748B' },
+            back:      { label: 'Espalda + bíceps',      short: 'Espalda', sub: 'Trapecio medio/inferior y romboides por encima del dorsal (2:1)', accent: '#10B981' },
+            quads:     { label: 'Cuádriceps + gemelos',  short: 'Cuád',    sub: 'Protección de menisco · flexión máx. 70-75° con carga',         accent: '#3B82F6' },
+            chest:     { label: 'Pecho + tríceps',       short: 'Pecho',   sub: 'Rango acortado · cero tirón sobre el esternón',                  accent: '#F43F5E' },
+            hams:      { label: 'Femoral + glúteo',      short: 'Femoral', sub: 'Sin peso muerto · cadera y rodilla estables',                    accent: '#F59E0B' },
+            shoulders: { label: 'Hombro + trapecio',     short: 'Hombro',  sub: 'Deltoides y músculos que llevan la escápula atrás y abajo',      accent: '#8B5CF6' },
+            posture:   { label: 'Postura + core (casa)', short: 'Postura', sub: 'En casa: esterilla, pared, toalla, banda y kettlebell · luego caminata o cardio',        accent: '#14B8A6' },
+            rest:      { label: 'Descanso',              short: 'Desc',    sub: 'Recuperación',                                                    accent: '#64748B' },
+            // Días del programa anterior (solo para mostrar el historial)
+            pull:      { label: 'Tracción (antiguo)',    short: 'Trac',    sub: 'Programa anterior', accent: '#047857', legacy: true },
+            legs:      { label: 'Cadena post. (antiguo)', short: 'C.Post', sub: 'Programa anterior', accent: '#1D4ED8', legacy: true },
+            mobility:  { label: 'Movilidad (antiguo)',   short: 'Movil',   sub: 'Programa anterior', accent: '#B45309', legacy: true },
+            push:      { label: 'Empuje (antiguo)',      short: 'Push',    sub: 'Programa anterior', accent: '#BE123C', legacy: true },
+            core:      { label: 'Core (antiguo)',        short: 'Core',    sub: 'Programa anterior', accent: '#6D28D9', legacy: true },
+            light:     { label: 'Kettlebell (antiguo)',  short: 'Kettle',  sub: 'Programa anterior', accent: '#0F766E', legacy: true },
         };
 
+        // Zonas del semáforo de dolor (0-10). wrist/knee se mantienen por compatibilidad con el historial.
+        const ZONES = [
+            { k: 'sternum',  label: 'Esternón',               short: 'Esternón' },
+            { k: 'side',     label: 'Costado izq. (serrato)', short: 'Costado' },
+            { k: 'shoulder', label: 'Hombro derecho',         short: 'Hombro' },
+            { k: 'groin',    label: 'Ingle / pelvis',         short: 'Ingle' },
+            { k: 'knee',     label: 'Rodilla izq. (menisco)', short: 'Rodilla' },
+            { k: 'wrist',    label: 'Muñeca derecha',         short: 'Muñeca' },
+        ];
+        const ZONE = Object.fromEntries(ZONES.map(z => [z.k, z]));
+        const emptyPain = () => Object.fromEntries(ZONES.map(z => [z.k, 0]));
+
+        const BLOCKS = { warm: 'Calentamiento', mob: 'Movilidad torácica', post: 'Fuerza postural con banda', main: 'Entreno', core: 'Circuito core · 3 vueltas', cardio: 'Cardio', cool: 'Estiramientos', later: 'Después: caminata o gym' };
+        const BLOCK_ORDER = ['warm', 'mob', 'post', 'main', 'core', 'cardio', 'cool', 'later'];
+        const yt = (id) => `https://youtu.be/${id}`;
+        const S = (n, extra = {}) => Array.from({ length: n }, () => ({ w: '', r: '', ...extra }));
+        const T = (n, sec) => Array.from({ length: n }, () => ({ sec, done: false }));
+        const W = (n, w) => Array.from({ length: n }, () => ({ w: String(w), r: '' }));
+
+        /* Calentamientos y vuelta a la calma (comunes) */
+        const WARM_TORSO = [
+            { name: 'Extensión torácica en foam roller', kind: 'timer', block: 'warm', video: yt('_S0npbwGk44'), sets: T(1, 120),
+              target: '2 min · 12-15 respiraciones', cue: 'Rulo en la zona dorsal media-alta, brazos cruzados abrazando los hombros, pelvis en retroversión. Respira hondo abriendo las costillas.' },
+            { name: 'Rotación externa en polea o banda', kind: 'reps', block: 'warm', video: yt('wQdfeB80fqo'), sets: S(2),
+              target: '2 × 15 por brazo · peso mínimo', cue: 'Codo pegado al costado a 90°. Sin dolor. Prepara el hombro para los empujes.' },
+        ];
+        const WARM_LEGS = [
+            { name: 'Bici estática con sillín alto', kind: 'timer', block: 'warm', video: yt('deKw7ml6vsY'), sets: T(1, 360),
+              target: '6 min · resistencia baja', cue: 'Sillín alto: la rodilla no se dobla en exceso arriba. Cadencia suave, sin apretar.' },
+            { name: 'Movilidad de cadera 90/90', kind: 'timer', block: 'warm', video: yt('adRzu0Vz37s'), sets: T(1, 120),
+              target: '2 min sin carga', cue: 'Suave, para preparar la cadera antes de abductores y aductores.' },
+        ];
+        // Estiramientos suaves (tensión 4-5/10, nunca dolor). Los pitidos a la mitad marcan el cambio de lado.
+        const ST = (name, video, cue, extra = {}) => ({ name, kind: 'timer', block: 'cool', halfBeep: true, video, sets: T(2, 60), target: '2 × 30 s por lado', cue, ...extra });
+        const PEC_STRETCH = ST('Estiramiento de pectoral en pared o marco', yt('_-uIjOogBJo'), 'Codo a 45°, tensión suave (5/10) y sin dolor en el esternón.', { zones: ['sternum'] });
+        const LAT_STRETCH = ST('Estiramiento de dorsal en poste', yt('mZzqAueXuws'), 'Agarra un poste a la altura del pecho y lleva la cadera atrás y hacia fuera. El dorsal acortado es uno de los que te cierran el pecho.',
+            { zones: ['side'], cond: 'Suave. Si tira del costado izquierdo, hazlo solo del lado derecho o sáltalo.' });
+        const COOL_TORSO = [
+            { name: 'Suspensión pasiva en barra', kind: 'timer', block: 'cool', video: yt('PORNGj-x4Ao'), sets: T(2, 30), zones: ['side', 'wrist'],
+              target: '2 × 30 s', cond: 'Solo si el costado izquierdo está a 0-1/10. Si molesta, sáltala.', cue: 'Cuelga relajado, sin balancearte.' },
+            PEC_STRETCH,
+            LAT_STRETCH,
+            ST('Estiramiento de trapecio superior y cuello', yt('3LIhdRvaUSU'), 'Sentado, inclina la oreja hacia el hombro y deja caer el hombro contrario. Sin tirar fuerte de la cabeza.'),
+        ];
+        const COOL_LEGS = [
+            ST('Estiramiento de psoas de pie', yt('mJBhb8qNrBQ'), 'De pie en zancada corta (sin apoyar la rodilla en el suelo), mete la pelvis y empuja la cadera adelante. Rodilla de atrás algo flexionada.'),
+            ST('Estiramiento de isquios tumbado con toalla', yt('65x3Gh7Qnwk'), 'Boca arriba, sube la pierna con una toalla. Rodilla casi recta, pero sin bloquearla.'),
+            ST('Estiramiento de glúteo tumbado (figura 4)', yt('3lq7T6R_Gy0'), 'Boca arriba, tobillo sobre la rodilla contraria y acerca las piernas al pecho. Si molesta la rodilla operada, no fuerces el ángulo.', { zones: ['knee'] }),
+            ST('Estiramiento de gemelo en pared', yt('nJNGMK7_Pj4'), 'Manos en la pared, pierna de atrás estirada y talón en el suelo. Rodilla recta pero sin empujarla hacia atrás.'),
+        ];
+        const DIAPHRAGM = { name: 'Respiración diafragmática tumbado', kind: 'timer', block: 'cool', video: yt('TuPaMCsnxes'), sets: T(1, 180),
+            target: '3 min · 10-12 respiraciones lentas', cue: 'Abre las costillas hacia los lados. Al soltar el aire, relaja trapecios y cuello. También vale en la cama antes de dormir.' };
+        const cardio = (method, target, cue) => ({ name: 'Cardio zona 2', kind: 'cardio', block: 'cardio', target, cue, cardio: { method, km: '', time: '', ppm: '', rounds: '' } });
+        const CARDIO_CUE = 'Pulso constante 140-150. Nada de sprints (más de 160) mientras moleste el esternón o el costado.';
+
         const TEMPLATES = {
-            pull: [
-                { name: 'Dominadas lastradas', kind: 'weighted',
-                  note: 'S1 6-10 al fallo técnico · S2 −20% 10-15. Descanso 5-7 min. Sube carga al llegar a 10 (S1) / 15 (S2).', sets: [] },
-                { name: 'Control escapular (scap pull-ups)', kind: 'reps', note: 'Submáximo, control. (Uri)', sets: [{ w: '', r: '' }] },
+            back: [
+                ...WARM_TORSO,
+                { name: 'Dominadas con peso corporal', kind: 'reps', rest: 150, video: yt('UwhqxIELoug'), sets: S(3), zones: ['side', 'shoulder', 'wrist'],
+                  target: '3 series · para a 2 reps del fallo', cond: 'Solo si el costado izquierdo está a 0-1/10. Si no, haz dominadas escapulares (3 × 8).',
+                  alt: 'Cámbialas por dominadas escapulares 3 × 8: brazos rectos, solo bajar y juntar escápulas.',
+                  cue: 'Sube sacando pecho, sin encoger los hombros hacia las orejas. Sin lastre.' },
+                { name: 'Jalón al pecho', kind: 'weighted', rest: 120, range: [10, 12], inc: 2.5, video: yt('72q0tKij5uU'), zones: ['side', 'shoulder'],
+                  sets: [{ label: 'Aprox', w: '25', r: '15' }, { label: 'Aprox', w: '45', r: '8' }, ...W(3, 60)],
+                  target: '3 × 10-12 · 60-65 kg', alt: 'Baja a 45-50 kg y no te quedes sin aire en ninguna repetición.',
+                  cue: 'Torso 15° atrás, barra a la clavícula, pausa 1-2 s juntando escápulas. Suelta el aire al tirar (sin aguantar la respiración).' },
+                { name: 'Remo sentado agarre ancho', kind: 'weighted', rest: 120, range: [12, 12], inc: 2.5, video: yt('L_Rheo-rv4o'), sets: S(4), zones: ['side'],
+                  target: '4 × 12', alt: 'Baja un 20-30% el peso y alarga la pausa atrás.',
+                  cue: 'Codos abiertos 45-60°. Tira hacia la boca del estómago (no al ombligo) y aguanta 2 s juntando escápulas.' },
+                { name: 'Face pull con cuerda', kind: 'weighted', rest: 75, range: [12, 15], inc: 2.5, video: yt('X-xCQ1gh-kA'), sets: S(3), zones: ['shoulder'],
+                  target: '3 × 15', cue: 'Cuerda hacia la frente rotando hacia fuera (puños detrás de las orejas). Sustituye al pájaro en máquina con el pecho apoyado.' },
+                { name: 'Curl de bíceps con respaldo o predicador', kind: 'weighted', rest: 75, range: [10, 12], inc: 1, video: yt('lXbs6as_TvA'), sets: S(3), zones: ['wrist'],
+                  target: '3 × 10-12', cue: 'Espalda apoyada, sin balanceo. Muñeca recta.' },
+                { name: 'Curl de muñeca', kind: 'weighted', rest: 60, range: [15, 15], inc: 1, video: yt('nUkrUUrrCLs'), sets: S(3), zones: ['wrist'],
+                  target: '3 × 15 · ligero', cond: 'Opcional. Solo si la muñeca derecha está a 0-2/10.', cue: 'Antebrazo apoyado, recorrido cómodo, sin dolor.' },
+                cardio('treadmill', '20-25 min · 140-150 ppm', 'Caminata inclinada o trote suave. ' + CARDIO_CUE),
+                ...COOL_TORSO,
             ],
-            legs: [
-                { name: 'Sentadilla búlgara rotacional', kind: 'weighted', video: 'https://youtu.be/sOziRhBSdro', note: 'Unilateral. Cada serie cuenta por ambas piernas (haz Izq y Der antes de anotar). Peso 0 si va sin carga.', sets: [{ w: '', r: '' }] },
-                { name: 'Peso muerto unilateral', kind: 'weighted', video: 'https://youtu.be/esNrC-CVoG8', note: 'Unilateral. Cada serie cuenta por ambas piernas (haz Izq y Der antes de anotar).', sets: [{ w: '', r: '' }] },
-                { name: 'Hip Thrust a una pierna', kind: 'weighted', video: 'https://youtu.be/z3tNiBXOW-4', note: 'Unilateral. Cada serie cuenta por ambas piernas (haz Izq y Der antes de anotar).', sets: [{ w: '', r: '' }] },
-                { name: 'Peso muerto unilateral + Triple flexión', kind: 'weighted', video: 'https://youtu.be/723znr5C6b8', note: 'Unilateral. Cada serie cuenta por ambas piernas (haz Izq y Der antes de anotar).', sets: [{ w: '', r: '' }] },
+            quads: [
+                ...WARM_LEGS,
+                { name: 'Sentadilla isométrica en pared', kind: 'timer', rest: 90, video: yt('7imrzDWGOtk'), sets: T(3, 45), zones: ['knee'],
+                  target: '3 × 40-45 s · unos 60° de flexión', alt: 'Hazla igualmente, pero más alta (menos flexión), en un ángulo sin dolor. Suele aliviar.',
+                  cue: 'Un palmo por encima del ángulo recto. Rodillas mirando al segundo dedo del pie.' },
+                { name: 'Extensión de cuádriceps', kind: 'weighted', rest: 90, range: [12, 15], inc: 2.5, video: yt('ndnA6yvGoqQ'), sets: S(4), zones: ['knee'],
+                  target: '4 × 12-15', alt: 'Peso ligero y solo la parte alta del recorrido, con pausas de 3 s arriba.',
+                  cue: 'Ajusta el rodillo para empezar a 75-80° (no doblar a tope). Sube en 2 s, aguanta 3 s arriba apretando el vasto interno, baja en 3 s.' },
+                { name: 'Prensa inclinada', kind: 'weighted', rest: 150, range: [12, 12], inc: 10, video: yt('bNsrqXUIJqc'), zones: ['knee'],
+                  sets: [{ label: 'Aprox', w: '60', r: '10' }, ...W(3, 100)],
+                  target: '3 × 12 · 100-120 kg', alt: 'Baja a 60-80 kg y recorta aún más la bajada. Si la rodilla pasa de 4/10, sáltala.',
+                  cue: 'Frena a 70-75°. Pies en la mitad alta. Bajada en 3 s. Sube SIN bloquear rodillas. Cabeza y hombros relajados.' },
+                { name: 'Prensa a una pierna', kind: 'weighted', rest: 90, range: [12, 12], inc: 5, video: yt('VpHZ_ELh10Y'), sets: W(2, 30), zones: ['knee'],
+                  target: '2 × 12 por pierna · 30-40 kg', alt: 'Peso mínimo o sáltala hoy.',
+                  cue: 'Recorrido corto. La rodilla apunta al segundo dedo del pie (que no se meta hacia dentro).' },
+                { name: 'Gemelo sentado en máquina', kind: 'weighted', rest: 60, range: [15, 15], inc: 5, video: yt('fRsvxLFYEh4'), sets: S(4),
+                  target: '4 × 15', cue: 'Pausa de 2 s arriba y 2 s abajo.' },
+                cardio('bike', '20 min · 140-150 ppm', 'Bici con sillín alto y tronco erguido, sin cargar peso en los codos. ' + CARDIO_CUE),
+                ...COOL_LEGS,
             ],
-            mobility: [
-                { name: 'Rutina de pies', kind: 'checklist', video: 'https://youtu.be/6aYPQFA5C-o', done: false },
-                { name: 'Movilidad muñeca + escápula', kind: 'checklist', done: false },
-                { name: 'Cat Cow', kind: 'reps', note: '4 series.', sets: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }] },
-                { name: 'Bird dog', kind: 'reps', note: '4 series.', sets: [{ w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }, { w: '', r: '' }] },
+            chest: [
+                ...WARM_TORSO,
+                { name: 'Press de pecho en máquina (agarre neutro)', kind: 'weighted', rest: 120, range: [10, 12], inc: 2.5, video: yt('d-gwsl5BlMQ'), zones: ['sternum', 'side', 'shoulder'],
+                  sets: [{ label: 'Aprox', w: '10', r: '15' }, { label: 'Aprox', w: '17.5', r: '8' }, ...W(3, 25)],
+                  target: '3 × 10-12 · 25-27,5 kg por lado', alt: 'Baja a 17,5-20 kg por lado y recorta más el recorrido.',
+                  cue: 'Frena 2-3 cm antes del tope. Los codos nunca pasan por detrás de la línea del tronco.' },
+                { name: 'Press con mancuernas en el suelo (neutro)', kind: 'weighted', rest: 120, range: [10, 12], inc: 2, video: yt('aHZuTZBrRAs'), sets: W(3, 16), zones: ['sternum', 'side', 'wrist'],
+                  target: '3 × 10-12 · 16-20 kg por mano', alt: 'Baja a 10-12 kg por mano.',
+                  cue: 'Tumbado en el suelo con agarre neutro: el suelo hace de tope y protege el esternón. Sustituye para siempre a las aperturas.' },
+                { name: 'Band pull-apart o face pull', kind: 'reps', rest: 45, video: yt('5OvpIHIaWDA'), sets: S(3),
+                  target: '3 × 15 suaves', cue: 'Intercálalo entre series para mantener las escápulas activas en el día de empuje.' },
+                { name: 'Tríceps en polea alta (cuerda o V)', kind: 'weighted', rest: 75, range: [12, 12], inc: 2.5, video: yt('uZg6VtRhwQY'), sets: S(3), zones: ['wrist'],
+                  target: '3 × 12', cue: 'Hombros fijos atrás y abajo. Solo se mueve el antebrazo.' },
+                { name: 'Press francés con mancuernas en el suelo', kind: 'weighted', rest: 75, range: [12, 12], inc: 1, video: yt('brrm--3S-b0'), sets: S(3), zones: ['wrist'],
+                  target: '3 × 12 · agarre neutro', cue: 'Nada de extensiones por detrás de la nuca (arquean la espalda y estiran serrato y esternón).' },
+                cardio('treadmill', '20-25 min · 140-150 ppm', CARDIO_CUE),
+                ...COOL_TORSO,
             ],
-            push: [
-                { name: 'Dips', kind: 'weighted', note: 'Objetivo: series de 20. Progresa añadiendo serie o reps. El peso queda en 0 hasta que subas.', sets: [{ w: '', r: '' }] },
+            hams: [
+                ...WARM_LEGS,
+                { name: 'Abductores en máquina (abrir)', kind: 'weighted', rest: 75, range: [15, 15], inc: 5, video: yt('7Oa_6915l3M'), zones: ['groin'],
+                  sets: [{ label: 'Cal.', w: '15', r: '15' }, { label: 'Cal.', w: '20', r: '15' }, ...S(4)],
+                  target: '2 de calentamiento + 4 × 15', alt: 'Peso mínimo y tope todavía más cerrado.',
+                  cue: 'Las 2 de calentamiento con el tope 2 puntos más cerrado (sin abrir del todo). Pausa de 2 s abierto, tronco erguido.' },
+                { name: 'Hip thrust en máquina', kind: 'weighted', rest: 120, range: [10, 12], inc: 5, video: yt('gdUC0EFGWfQ'), sets: S(4), zones: ['knee'],
+                  target: '4 × 10-12', alt: 'Baja un 20-30% el peso.',
+                  cue: 'Pies colocados para que arriba las tibias queden verticales. Barbilla recogida, aguanta 2 s arriba.' },
+                { name: 'Curl femoral sentado', kind: 'weighted', rest: 90, range: [12, 12], inc: 2.5, video: yt('CBCPBnMzsMI'), sets: S(4), zones: ['knee'],
+                  target: '4 × 12', alt: 'Peso ligero y recorrido corto. Si pincha detrás de la rodilla, para.',
+                  cue: 'Al volver, frena 5° antes de estirar del todo: el rodillo nunca debe llevar la rodilla a hiperextensión.' },
+                { name: 'Curl femoral tumbado', kind: 'weighted', rest: 90, range: [12, 15], inc: 2.5, video: yt('9xbBr5Ytl8c'), sets: S(3), zones: ['knee'],
+                  target: '3 × 12-15', alt: 'Peso ligero y recorrido corto.',
+                  cue: 'No te agarres fuerte encogiendo los hombros (protege el esternón). Deja 5° de flexión al bajar.' },
+                { name: 'Aductores en máquina (cerrar)', kind: 'weighted', rest: 75, range: [15, 15], inc: 5, video: yt('udHXS4AD2iI'), sets: S(3), zones: ['groin'],
+                  target: '3 × 15 · rango corto/moderado', alt: 'Recorta todavía más la apertura.',
+                  cue: 'Nunca busques el estiramiento máximo: es lo que dispara el pinchazo en el pubis.' },
+                cardio('treadmill', '20 min suaves · 140-150 ppm', CARDIO_CUE),
+                ...COOL_LEGS,
             ],
-            core: [
-                { name: 'Plancha (codos)', kind: 'timer', note: 'Edita los minutos por serie. Pitido los últimos 3 s.', sets: [{ sec: 120, done: false }] },
-                { name: 'Dead bug', kind: 'timer', note: 'Por tiempo.', sets: [{ sec: 45, done: false }] },
-                { name: 'Anti-rotación (pallof)', kind: 'timer', halfBeep: true, note: 'Suena a la mitad: cambia de lado.', sets: [{ sec: 90, done: false }] },
+            shoulders: [
+                ...WARM_TORSO,
+                { name: 'Press de hombro en máquina (agarre neutro)', kind: 'weighted', rest: 120, range: [10, 12], inc: 2.5, video: yt('NjZy28n8Qto'), zones: ['shoulder', 'sternum'],
+                  sets: [{ label: 'Aprox', w: '7.5', r: '15' }, { label: 'Aprox', w: '12.5', r: '8' }, ...W(3, 17.5)],
+                  target: '3 × 10-12 · 17,5-20 kg', alt: 'Baja a 10-12,5 kg y para un poco antes de la barbilla.',
+                  cue: 'Solo después de las rotaciones externas. Palmas enfrentadas, codos 45° adelante. Baja solo hasta la barbilla.' },
+                { name: 'Elevaciones laterales en máquina', kind: 'weighted', rest: 75, range: [12, 15], inc: 2.5, video: yt('aKDYtQbCKWY'), sets: S(4), zones: ['shoulder'],
+                  target: '4 × 12-15', cue: 'Lleva los codos hacia las paredes. No subas de 90° ni encojas el cuello.' },
+                { name: 'Deltoides posterior sin apoyar el pecho', kind: 'weighted', rest: 75, range: [12, 15], inc: 1, video: yt('b0IK-daWMm0'), sets: S(4), zones: ['sternum'],
+                  target: '4 × 15',
+                  cue: 'A) Cruce de poleas altas a la altura de los ojos. B) Pájaros con 4-6 kg apoyando la FRENTE en el banco, no el pecho. C) Máquina sentado a 2-3 cm del cojín.' },
+                { name: 'Encogimientos de trapecio de pie', kind: 'weighted', rest: 90, range: [12, 15], inc: 2, video: yt('NDFLF-IhIrY'), sets: S(4), zones: ['knee', 'wrist'],
+                  target: '4 × 12-15', alt: 'Hazlos sentado o con el pecho apoyado en un banco inclinado (vídeo en Guía).',
+                  cue: 'Mirada al suelo a 1 m, rodillas con 5° de flexión (NUNCA bloqueadas). Torso 15° adelante, mancuernas a los lados. Hombros arriba y atrás en diagonal, 2 s arriba.' },
+                { name: 'Elevaciones en Y en banco inclinado', kind: 'weighted', rest: 60, range: [12, 12], inc: 1, video: yt('jo6ELwm1C7Y'), sets: W(3, 2), zones: ['sternum', 'shoulder'],
+                  target: '3 × 12 · 2-4 kg', alt: 'Hazlas de pie con el tronco inclinado 45°, sin apoyar el pecho.',
+                  cue: 'Pulgares al techo. Baja las escápulas antes de subir. Si apoyar el pecho en el banco molesta el esternón, hazlas de pie inclinado.' },
+                cardio('treadmill', '20-25 min · 140-150 ppm', CARDIO_CUE),
+                ...COOL_TORSO,
             ],
-            light: [
-                { name: 'Shoulder', kind: 'weighted', video: 'https://www.instagram.com/reel/DWJrhsLChHS/?igsh=cG00cGIxcTJxZHU=', note: 'Kettlebell. KG · reps · series. Añade series con “+”. No hace falta hacer los 3 ejercicios siempre.', sets: [{ w: '', r: '' }] },
-                { name: 'Abs', kind: 'weighted', video: 'https://www.instagram.com/reel/DRXgaGvD0fU/?igsh=MXZhYzZjNzVycW5zdw==', note: 'Kettlebell. KG · reps · series.', sets: [{ w: '', r: '' }] },
-                { name: 'Cardio KB', kind: 'weighted', video: 'https://www.instagram.com/reel/DYslVJHSBGb/?igsh=MWR6MDJlbGp5OWpjdA==', note: 'Kettlebell. KG · reps · series.', sets: [{ w: '', r: '' }] },
+            posture: [
+                { name: 'Extensión torácica con toalla o foam roller', kind: 'reps', block: 'mob', video: yt('dcw3gNm-1bM'), sets: S(2),
+                  target: '2 × 12 respiraciones', cue: 'En casa vale una toalla enrollada bajo la zona dorsal media-alta. Brazos cruzados, respiración profunda abriendo costillas.' },
+                { name: 'Rotación torácica tumbado de lado (libro abierto)', kind: 'reps', block: 'mob', video: yt('irlVAgSjFCE'), sets: S(2),
+                  target: '2 × 10 por lado', cue: 'Rodillas juntas y dobladas, abre el brazo de arriba siguiéndolo con la mirada. No carga el brazo ni el serrato.' },
+                { name: 'Wall slides (ángeles en la pared)', kind: 'reps', block: 'mob', video: yt('gr3i4mU5kBc'), sets: S(3), zones: ['shoulder'],
+                  target: '3 × 10 lentas', cue: 'Espalda, glúteos y cabeza pegados a la pared. Brazos de W a Y sin arquear la zona lumbar.' },
+                { name: 'Retracción cervical (chin tuck)', kind: 'reps', block: 'mob', video: yt('TXfCQX-50LI'), sets: S(2),
+                  target: '2 × 10 · 3 s', cue: 'Mete la barbilla hacia atrás (papada) sin bajar la cabeza. Corrige la cabeza adelantada.' },
+                { name: 'Y-T-W boca abajo', kind: 'reps', block: 'mob', video: yt('rGpqCrupSGA'), sets: S(2), zones: ['sternum'],
+                  target: '2 × 10', alt: 'Hazlas de pie con el tronco inclinado, sin apoyar el pecho en el suelo.',
+                  cue: 'Escápulas atrás y abajo antes de levantar los brazos. Sin peso o con muy poco.' },
+                { name: 'Rotación externa con banda', kind: 'reps', block: 'post', video: yt('wQdfeB80fqo'), sets: S(2), zones: ['shoulder'],
+                  target: '2 × 15 por brazo', cue: 'Codo pegado al costado a 90°. Fortalece el infraespinoso, que tira del hombro hacia atrás.' },
+                { name: 'Band pull-apart', kind: 'reps', block: 'post', video: yt('5OvpIHIaWDA'), sets: S(3),
+                  target: '3 × 15', cue: 'Brazos rectos a la altura del pecho, abre la banda juntando escápulas. Sin encoger hombros.' },
+                { name: 'Bird dog', kind: 'reps', block: 'core', video: yt('hUIrLbMnglY'), sets: S(3), zones: ['side', 'wrist'],
+                  target: '3 × 10 por lado · 3 s en extensión', alt: 'Hazlo solo con las piernas (manos apoyadas, sin levantar el brazo).',
+                  cue: 'Espalda quieta como una mesa. Estira brazo y pierna contrarios y aguanta 3 s.' },
+                { name: 'Dead bug', kind: 'reps', block: 'core', video: yt('0JFVLaTLzHg'), sets: S(3),
+                  target: '3 × 10 por lado', cue: 'Zona lumbar pegada a la esterilla y costillas bajas cerradas todo el rato.' },
+                { name: 'Press Pallof con banda en la puerta', kind: 'reps', block: 'core', video: yt('paOG670vr9c'), sets: S(3), zones: ['side'],
+                  target: '3 × 12 por lado · pausa 2 s', cue: 'Banda anclada en el marco a la altura del pecho. Brazos al frente 2 s sin dejar que te gire.' },
+                { name: 'Paseo del granjero a una mano', kind: 'timer', block: 'core', halfBeep: true, video: yt('58zoUXlwDRM'), sets: T(3, 80), zones: ['side', 'wrist', 'knee'],
+                  target: '3 × 40 s por mano · kettlebell o mochila con peso', alt: 'Empieza con 12-16 kg.',
+                  cue: 'Por el pasillo. Hombros atrás, pecho alto, rodillas sin bloquear. Pita a la mitad: cambia de mano.' },
+                PEC_STRETCH,
+                { ...LAT_STRETCH, name: 'Estiramiento de dorsal en marco de puerta', cue: 'Agarra el marco a la altura del pecho y lleva la cadera atrás y hacia fuera.' },
+                DIAPHRAGM,
+                { name: 'Caminata o cardio en el gym', kind: 'cardio', block: 'later', target: '40-45 min · zona 2',
+                  cue: 'Caminata rápida por la calle o cardio en el gym. Si caminando no llegas a 140 ppm, no pasa nada: aquí cuenta la duración. Nada de sprints.',
+                  cardio: { method: 'walk', km: '', time: '', ppm: '', rounds: '' } },
             ],
             rest: [
-                { name: 'Stretch', kind: 'checklist', video: 'https://www.instagram.com/reel/DZDv7rgyrcp/?igsh=MWU3amxkcHhtbjJ4eQ==', done: false },
+                { name: 'Paseo suave o movilidad libre', kind: 'checklist', done: false, cue: 'Descanso activo: nada de cargas.' },
+                { name: 'Yoga postural (10 min, opcional)', kind: 'checklist', done: false, video: yt('b74nFL12E2Y'), cue: 'Sesión corta de Yoga con Palo y Dan. Sáltate cualquier postura que moleste el esternón.' },
             ],
         };
-        const SUGGEST = { push: [{ name: 'Flexiones a puños', kind: 'reps', note: 'Vuelta si molesta la muñeca.' }] };
+        const SUGGEST = {};
+
+        // Lista negra (sección 3 del informe). Se avisa al añadir un ejercicio que coincida.
+        const BLACKLIST = [
+            { re: /fondo|\bdips?\b|paralelas/i, why: 'fondos en paralelas' },
+            { re: /lastrad/i, why: 'ejercicios lastrados (dominadas/fondos)' },
+            { re: /pec ?deck|apertura|\bfly|flyes|contractora/i, why: 'aperturas / pec deck (abren el esternón bajo carga)' },
+            { re: /crunch|encogimiento abdominal|abdominal(es)? (en )?(suelo|máquina|polea)/i, why: 'crunches (tiran del esternón y las costillas)' },
+            { re: /plancha|plank/i, why: 'planchas boca abajo mientras moleste el costado' },
+            { re: /sentadilla (libre|con barra|trasera|frontal)|back squat/i, why: 'sentadilla libre con barra (menisco)' },
+            { re: /peso muerto|deadlift|rumano/i, why: 'peso muerto convencional o rumano pesado' },
+            { re: /sprint|hiit/i, why: 'sprints o HIIT (más de 170 ppm) mientras haya inflamación' },
+        ];
+        const blacklisted = (name) => { const b = BLACKLIST.find(x => x.re.test(name || '')); return b ? b.why : null; };
+
+        // Biblioteca de vídeos del informe (todos comprobados el 17/11/2026)
+        const LIBRARY = [
+            { title: 'Dolor de esternón en fondos (costocondritis)', items: [
+                ['Juan Gasón · Por qué te duele el pecho en fondos', yt('CorD5gv4TLM')],
+                ['Miguel Tirado · Dolor de esternón en fondos', yt('Xy-zn6t4kUk')],
+                ['Calisthenicmovement · Fix your dips', yt('l5d_LyuaWKk')],
+                ['Jake Williams · Exercises that fixed my pain with dips', yt('F-kY0YoLLvw')],
+            ] },
+            { title: 'Movilidad torácica y escápula (fisio)', items: [
+                ['PhysioWods · Movilidad para la hipercifosis dorsal', yt('g9Jj9Igw-_w')],
+                ['PhysioWods · 4 ejercicios de movilidad torácica', yt('Amtg-XFDIaI')],
+                ['Julia Reppel · 10 min thoracic spine mobility', yt('426rzPkx4D8')],
+                ['FisioOnline · 6 ejercicios para la cintura escapular', yt('vTU2AXyCgyA')],
+                ['FisioOnline · Fortalecer la espalda', yt('72Dkz4gN4K4')],
+                ['Marcos Sacristán · 5 ejercicios para la postura encorvada', yt('9uC-UzbDdos')],
+                ['Marcos Sacristán · Rutina para la dorsalgia', yt('aS3poR9aY3s')],
+            ] },
+            { title: 'Encogimientos de trapecio', items: [
+                ['Equus Gym · Encogimiento en banco inclinado', yt('zI2fCWfuphg')],
+                ['Angel Quintana · Incline shrug', yt('mhSF1aio128')],
+                ['BlueGym · La mejor manera de hacer encogimientos', yt('NDFLF-IhIrY')],
+            ] },
+            { title: 'Sesiones guiadas de pilates y yoga postural', items: [
+                ['Anabel Otero · Pilates espalda alta (20 min)', yt('Y5XndphLtQU')],
+                ['Anabel Otero · Yoga para corregir la postura (24 min)', yt('m8lC-dUJHTM')],
+                ['Pia Yoga · Abrir pecho, hombros y espalda alta (31 min)', yt('RPATAvHbunA')],
+                ['Xuan Lan · Apertura de pecho (18 min)', yt('rdHLRphdNTg')],
+                ['Yoga con Palo y Dan · Mejorar tu postura (10 min)', yt('b74nFL12E2Y')],
+                ['Lista · Softer Pilates: estiramientos', 'https://www.youtube.com/playlist?list=PLzqibNKHX3EAHIc6GYrNdnDAel0z3Qq9D'],
+                ['Lista · Bienestar Pilates: espalda sana', 'https://www.youtube.com/playlist?list=PLVRRURfeLKaj_ZuzRJdUgYyxhkinkpVqY'],
+                ['Lista · Yoga con Palo y Dan: postura', 'https://www.youtube.com/playlist?list=PL6gYJugYq9xQEUcpyEaWGU0Xn1pjcC9CK'],
+                ['Lista · Anabel Otero: cuello y hombros', 'https://www.youtube.com/playlist?list=PL8dEq9uyxbLCi89GCajHcKvRXmiZWQXEW'],
+                ['Lista · Inma Alhambra: hombros y espalda', 'https://www.youtube.com/playlist?list=PLyEHZUFWrP4OdxzbbdEbjEQSLwx1tpQ1W'],
+            ] },
+        ];
 
         const dstr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const todayStr = () => dstr(new Date());
-        const r05 = (v) => Math.round(v * 2) / 2;
-        const STRAT = (rm) => { const m = Number(rm) || 0; return { cal2: r05(m * 0.60), cal3: r05(m * 0.80), s1: r05(m * 0.75), s2: r05(m * 0.75 * 0.80) }; };
+        const isWarmSet = (s) => /^(aprox|cal)/i.test(s?.label || '');
         const seed = (t, rm, prevEx, base) => {
             const ex = JSON.parse(JSON.stringify(base || TEMPLATES[t] || []));
-            if (t === 'pull') {
-                const s = STRAT(rm);
-                const d = ex.find(e => e.name === 'Dominadas lastradas');
-                if (d) d.sets = [
-                    { label: 'Cal. 1', w: '0', r: '5' },
-                    { label: 'Cal. 2', w: String(s.cal2), r: '3' },
-                    { label: 'Cal. 3', w: String(s.cal3), r: '1-2' },
-                    { label: 'Serie 1', w: String(s.s1), r: '' },
-                    { label: 'Serie 2', w: String(s.s2), r: '' },
-                ];
-            }
             if (prevEx && prevEx.length) {
                 ex.forEach(e => {
                     const p = prevEx.find(x => x.name === e.name);
@@ -159,23 +365,27 @@
             }
             return ex;
         };
-        const CARDIO_METHODS = { walk: 'Caminar', elliptical: 'Elíptica', bike: 'Bici', hiit: 'HIIT' };
+        const CARDIO_METHODS = { treadmill: 'Cinta incl.', walk: 'Caminar', bike: 'Bici', elliptical: 'Elíptica', hiit: 'HIIT' };
+        const CARDIO_OFFER = ['treadmill', 'walk', 'bike', 'elliptical']; // HIIT queda fuera mientras haya inflamación
+        const HR_CAP = 160;
         const KINDS = { weighted: 'Peso + reps', reps: 'Solo reps', timer: 'Temporizador', checklist: 'Checklist', cardio: 'Cardio' };
-        const shapeFor = (kind) => kind === 'checklist' ? { done: false } : kind === 'cardio' ? { cardio: { method: 'walk', km: '', time: '', ppm: '', rounds: '' } } : kind === 'timer' ? { sets: [{ sec: 60, done: false }] } : { sets: [{ w: '', r: '' }] };
+        const shapeFor = (kind) => kind === 'checklist' ? { done: false } : kind === 'cardio' ? { cardio: { method: 'treadmill', km: '', time: '', ppm: '', rounds: '' } } : kind === 'timer' ? { sets: [{ sec: 60, done: false }] } : { sets: [{ w: '', r: '' }] };
         const loadTemplates = () => { try { return JSON.parse(localStorage.getItem('mp2_templates')) || {}; } catch { return {}; } };
 
         /* ---------- MIGRACIÓN ---------- */
+        const normPain = (pain) => {
+            if (typeof pain === 'number' || typeof pain === 'string') pain = { wrist: Number(pain) || 0 };
+            pain = pain || {};
+            return Object.fromEntries(ZONES.map(z => [z.k, Number(pain[z.k]) || 0]));
+        };
         const normEntry = (e) => {
             if (!e) return null;
             const map = { push: 'push', pull: 'pull', legs: 'legs', rest: 'rest' };
             const dayType = e.dayType || map[e.type] || 'pull';
-            let pain = e.pain;
-            if (typeof pain === 'number' || typeof pain === 'string') pain = { wrist: Number(pain) || 0, knee: 0 };
-            if (!pain) pain = { wrist: 0, knee: 0 };
             let exercises = e.exercises;
             if (!exercises && Array.isArray(e.exs)) exercises = e.exs.map(x => ({ name: x.n || 'Ejercicio', kind: 'weighted', sets: (x.s || []).map(s => ({ w: s.w ?? '', r: s.r ?? '' })) }));
             if (Array.isArray(exercises)) exercises.forEach(ex => { if (ex && ex.name === 'Dips (sin lastre)') ex.name = 'Dips'; });
-            return { id: e.id || Date.now() + Math.random(), date: e.date || todayStr(), dayType, bw: e.bw ?? '', pain: { wrist: Number(pain.wrist) || 0, knee: Number(pain.knee) || 0 }, notes: e.notes || '', exercises: Array.isArray(exercises) ? exercises : [] };
+            return { id: e.id || Date.now() + Math.random(), date: e.date || todayStr(), dayType, bw: e.bw ?? '', pain: normPain(e.pain), painSet: e.painSet ?? true, notes: e.notes || '', exercises: Array.isArray(exercises) ? exercises : [] };
         };
         const profileFrom = (p = {}) => ({ bw: p.bw ?? 85, oneRM: p.oneRM ?? p.pullRef ?? p.pull ?? 40 });
         const loadProfile = () => profileFrom(JSON.parse(localStorage.getItem('mp2_prof') || localStorage.getItem('mp_prof') || '{}'));
@@ -183,14 +393,21 @@
         const loadWeight = () => { try { return (JSON.parse(localStorage.getItem('mp2_weight') || '[]') || []).filter(x => x && x.date).sort((a, b) => new Date(b.date) - new Date(a.date)); } catch { return []; } };
 
         const METRICS = {
-            weight:    { label: 'Peso corporal', unit: ' kg', src: 'weight' },
-            fat:       { label: '% Grasa (báscula)', unit: ' %', src: 'fat' },
-            pull:      { label: 'Dominadas (kg lastre)', unit: ' kg', src: 'maxW', ex: 'Dominadas lastradas' },
-            dips:      { label: 'Dips (reps totales)', unit: ' reps', src: 'sumR', ex: 'Dips' },
-            plank:     { label: 'Plancha (tiempo)', unit: '', src: 'maxSec', ex: 'Plancha (codos)' },
-            painWrist: { label: 'Dolor muñeca derecha', unit: '/10', src: 'wrist' },
-            painKnee:  { label: 'Dolor rodilla izq.',   unit: '/10', src: 'knee' },
+            weight:      { label: 'Peso corporal', unit: ' kg', src: 'weight' },
+            fat:         { label: '% Grasa (báscula)', unit: ' %', src: 'fat' },
+            latpull:     { label: 'Jalón al pecho (kg)', unit: ' kg', src: 'maxW', ex: 'Jalón al pecho' },
+            chestpress:  { label: 'Press pecho máquina (kg/lado)', unit: ' kg', src: 'maxW', ex: 'Press de pecho en máquina (agarre neutro)' },
+            legpress:    { label: 'Prensa inclinada (kg)', unit: ' kg', src: 'maxW', ex: 'Prensa inclinada' },
+            shpress:     { label: 'Press hombro máquina (kg)', unit: ' kg', src: 'maxW', ex: 'Press de hombro en máquina (agarre neutro)' },
+            hipthrust:   { label: 'Hip thrust máquina (kg)', unit: ' kg', src: 'maxW', ex: 'Hip thrust en máquina' },
+            wallsit:     { label: 'Sentadilla isométrica (tiempo)', unit: '', src: 'maxSec', ex: 'Sentadilla isométrica en pared' },
+            cardioPpm:   { label: 'Cardio · pulso medio', unit: ' ppm', src: 'ppm' },
+            ...Object.fromEntries(ZONES.map(z => ['pain_' + z.k, { label: `Dolor · ${z.label}`, unit: '/10', src: 'pain', zone: z.k }])),
+            pull:        { label: 'Dominadas lastradas (antiguo)', unit: ' kg', src: 'maxW', ex: 'Dominadas lastradas' },
+            dips:        { label: 'Dips (antiguo)', unit: ' reps', src: 'sumR', ex: 'Dips' },
+            plank:       { label: 'Plancha (antiguo)', unit: '', src: 'maxSec', ex: 'Plancha (codos)' },
         };
+        const METRIC_ALIAS = { painWrist: 'pain_wrist', painKnee: 'pain_knee' };
 
         /* ---------- UI BASE ---------- */
         const Card = ({ children, className = '' }) => (<div className={`bg-[#121826] border border-white/[0.06] rounded-3xl ${className}`}>{children}</div>);
@@ -286,14 +503,18 @@
         };
 
         const CardioBlock = ({ ex, accent, onChange }) => {
-            const c = ex.cardio || { method: 'walk' };
+            const c = ex.cardio || { method: 'treadmill' };
             const set = (k, v) => onChange({ ...ex, cardio: { ...c, [k]: v } });
-            const F = ({ k, label }) => (<div className="bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06] flex-1"><label className="text-[9px] block text-slate-500 font-bold uppercase">{label}</label><input type="number" inputMode="decimal" placeholder="0" value={c[k] || ''} onChange={e => set(k, e.target.value)} className="bg-transparent w-full font-black outline-none" /></div>);
+            // Se llama como función (no como <F/>) para que el input no se vuelva a montar y pierda el foco al teclear.
+            const F = (k, label) => (<div key={k} className="bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06] flex-1"><label className="text-[9px] block text-slate-500 font-bold uppercase">{label}</label><input type="number" inputMode="decimal" placeholder="0" value={c[k] || ''} onChange={e => set(k, e.target.value)} className="bg-transparent w-full font-black outline-none" /></div>);
+            const methods = CARDIO_OFFER.includes(c.method) ? CARDIO_OFFER : [...CARDIO_OFFER, c.method];
+            const ppm = Number(c.ppm) || 0;
             return (<div className="p-4 space-y-3">
-                <div className="grid grid-cols-4 gap-1.5">{Object.keys(CARDIO_METHODS).map(m => <button key={m} onClick={() => set('method', m)} className="py-2 rounded-lg text-[11px] font-bold tap border" style={c.method === m ? { background: accent, borderColor: accent, color: '#fff' } : { borderColor: '#ffffff14', color: '#64748b' }}>{CARDIO_METHODS[m]}</button>)}</div>
-                {c.method === 'hiit' ? (<><p className="text-[11px] text-slate-400 bg-white/[0.03] rounded-xl p-2.5">20 s a tope / 90 s relax.</p><div className="flex gap-2"><F k="rounds" label="Rondas" /><F k="ppm" label="Pulsaciones med." /></div></>)
-                : c.method === 'elliptical' ? <div className="flex gap-2"><F k="time" label="Tiempo (min)" /><F k="ppm" label="Pulsaciones med." /></div>
-                : <div className="flex gap-2"><F k="km" label="Km" /><F k="time" label="Tiempo (min)" /><F k="ppm" label="Puls. med." /></div>}
+                <div className="grid grid-cols-4 gap-1.5">{methods.map(m => <button key={m} onClick={() => set('method', m)} className="py-2 rounded-lg text-[11px] font-bold tap border" style={c.method === m ? { background: accent, borderColor: accent, color: '#fff' } : { borderColor: '#ffffff14', color: '#64748b' }}>{CARDIO_METHODS[m] || m}</button>)}</div>
+                {c.method === 'hiit' ? <div className="flex gap-2">{F('rounds', 'Rondas')}{F('ppm', 'Pulsaciones med.')}</div>
+                : c.method === 'elliptical' ? <div className="flex gap-2">{F('time', 'Tiempo (min)')}{F('ppm', 'Pulsaciones med.')}</div>
+                : <div className="flex gap-2">{F('km', 'Km')}{F('time', 'Tiempo (min)')}{F('ppm', 'Puls. med.')}</div>}
+                {ppm > HR_CAP && <p className="text-[11px] font-bold rounded-xl p-2.5" style={{ color: '#FDA4AF', background: '#F43F5E1A' }}>Más de {HR_CAP} ppm. Mientras moleste el esternón o el costado, quédate en 140-150 (nada de sprints).</p>}
             </div>);
         };
 
@@ -303,19 +524,20 @@
             const [history, setHistory] = useState(loadHistory);
             const [weightLog, setWeightLog] = useState(loadWeight);
             const [templates, setTemplates] = useState(loadTemplates);
-            const [editDay, setEditDay] = useState('pull');
+            const [editDay, setEditDay] = useState('back');
             const [editList, setEditList] = useState(null);
             const [restAt, setRestAt] = useState(null);
             const [restNonce, setRestNonce] = useState(0);
             const [tab, setTab] = useState('today');
             const [date, setDate] = useState(todayStr());
-            const [session, setSession] = useState({ dayType: null, pain: { wrist: 0, knee: 0 }, notes: '', exercises: [] });
+            const [session, setSession] = useState({ dayType: null, pain: emptyPain(), painSet: false, notes: '', exercises: [] });
             const [toast, setToast] = useState('');
             const [expanded, setExpanded] = useState(null);
             const [adding, setAdding] = useState(false);
             const [newEx, setNewEx] = useState({ name: '', kind: 'weighted' });
             const [cardioOpen, setCardioOpen] = useState(false);
-            const [charts, setCharts] = useState(() => { try { return JSON.parse(localStorage.getItem('mp2_charts')) || ['weight', 'fat', 'pull']; } catch { return ['weight', 'fat', 'pull']; } });
+            const [painOpen, setPainOpen] = useState(false);
+            const [charts, setCharts] = useState(() => { try { return (JSON.parse(localStorage.getItem('mp2_charts')) || ['pain_knee', 'latpull', 'weight']).map(k => METRIC_ALIAS[k] || k); } catch { return ['pain_knee', 'latpull', 'weight']; } });
             const [range, setRange] = useState(90);
             const [wForm, setWForm] = useState({ date: todayStr(), w: '', fat: '' });
             const [diaryView, setDiaryView] = useState('week');
@@ -337,9 +559,9 @@
             const editUpd = (k, fn) => setEditList(l => l.map((e, i) => i === k ? fn({ ...e }) : e));
             const editMove = (k, dir) => setEditList(l => { const n = [...l]; const j = k + dir; if (j < 0 || j >= n.length) return l; [n[k], n[j]] = [n[j], n[k]]; return n; });
             const editDel = (k) => setEditList(l => l.filter((_, i) => i !== k));
-            const editAdd = () => setEditList(l => [...l, { name: 'Nuevo ejercicio', kind: 'weighted', ...shapeFor('weighted') }]);
-            const editKind = (k, kind) => editUpd(k, e => ({ name: e.name, video: e.video, note: e.note, kind, ...shapeFor(kind) }));
-            const saveEdit = () => { const clean = (editList || []).filter(e => (e.name || '').trim()); setTemplates(t => ({ ...t, [editDay]: clean })); setEditList(null); ping(`Plantilla "${DAYS[editDay].label}" guardada`); };
+            const editAdd = () => setEditList(l => [...l, { name: 'Nuevo ejercicio', kind: 'weighted', block: 'main', rest: 90, ...shapeFor('weighted') }]);
+            const editKind = (k, kind) => editUpd(k, e => { const { sets, done, cardio, ...meta } = e; return { ...meta, kind, ...shapeFor(kind) }; });
+            const saveEdit = () => { const clean = (editList || []).filter(e => (e.name || '').trim()); const bad = clean.filter(e => blacklisted(e.name)); if (bad.length && !confirm(`En lista negra: ${bad.map(e => `${e.name} (${blacklisted(e.name)})`).join(', ')}. ¿Guardar igualmente?`)) return; setTemplates(t => ({ ...t, [editDay]: clean })); setEditList(null); ping(`Plantilla "${DAYS[editDay].label}" guardada`); };
             const resetTemplates = () => { const a = prompt('Esto borra TODAS tus plantillas personalizadas y vuelve a la base original. Escribe RESET para confirmar:'); if (a === 'RESET') { setTemplates({}); localStorage.removeItem('mp2_templates'); setEditList(null); ping('Plantillas restablecidas a base'); } };
             const ping = (m) => { setToast(m); setTimeout(() => setToast(''), 2400); };
 
@@ -367,7 +589,8 @@
                 return () => { clearInterval(id); document.removeEventListener('visibilitychange', check); };
             }, [activeDates, streak]);
 
-            const suggestType = useMemo(() => { if (!history.length) return ORDER[0]; const i = ORDER.indexOf(history[0].dayType); return ORDER[(i + 1) % ORDER.length]; }, [history]);
+            const nextAfter = (t) => { const i = ORDER.indexOf(t); return i < 0 ? ORDER[0] : ORDER[(i + 1) % ORDER.length]; };
+            const suggestType = useMemo(() => history.length ? nextAfter(history[0].dayType) : ORDER[0], [history]);
             const dayType = session.dayType || suggestType;
             const theme = DAYS[dayType] || DAYS.rest;
 
@@ -375,8 +598,8 @@
 
             useEffect(() => {
                 const saved = history.find(h => h.date === date);
-                if (saved) setSession({ dayType: saved.dayType, pain: { ...saved.pain }, notes: saved.notes, exercises: JSON.parse(JSON.stringify(saved.exercises)) });
-                else setSession({ dayType: suggestType, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(suggestType, profile.oneRM, lastSame(suggestType), baseFor(suggestType)) });
+                if (saved) setSession({ dayType: saved.dayType, pain: normPain(saved.pain), painSet: saved.painSet ?? true, notes: saved.notes, exercises: JSON.parse(JSON.stringify(saved.exercises)) });
+                else setSession({ dayType: suggestType, pain: emptyPain(), painSet: false, notes: '', exercises: seed(suggestType, profile.oneRM, lastSame(suggestType), baseFor(suggestType)) });
             }, [date]);
 
             const changeDay = (t) => setSession(s => ({ ...s, dayType: t, exercises: seed(t, profile.oneRM, lastSame(t), baseFor(t)) }));
@@ -396,7 +619,7 @@
                     const hasW = s.w !== '' && s.w !== undefined && s.w !== null;
                     const wNum = parseFloat(s.w);
                     const key = hasW ? String(isNaN(wNum) ? s.w : wNum) : '__none__';
-                    const label = !hasW ? '' : (wNum === 0 ? '0kg' : `+${wNum}kg`);
+                    const label = !hasW ? '' : `${String(isNaN(wNum) ? s.w : wNum).replace('.', ',')} kg`;
                     let g = groups.find(x => x.key === key);
                     if (!g) { g = { key, label, reps: [] }; groups.push(g); }
                     g.reps.push((s.r !== '' && s.r !== undefined && s.r !== null) ? String(s.r) : '0');
@@ -404,12 +627,43 @@
                 const lines = groups.map(g => `${g.label ? g.label + ' · ' : ''}${g.reps.join('+')}r`);
                 return `Última ${ds}:\n${lines.join('\n')}`;
             };
-            const strat = useMemo(() => STRAT(profile.oneRM), [profile.oneRM]);
             const daysSinceBackup = lastBackup ? Math.floor((Date.now() - new Date(lastBackup).getTime()) / 86400000) : Infinity;
             const needBackup = daysSinceBackup >= 14;
 
+            /* ---- Semáforo: estado de cada ejercicio según el dolor de hoy ---- */
+            const zoneMax = (ex, pain) => (ex.zones || []).reduce((m, z) => Math.max(m, Number((pain || {})[z]) || 0), 0);
+            const worstZone = (ex, pain) => (ex.zones || []).reduce((b, z) => ((Number((pain || {})[z]) || 0) > (Number((pain || {})[b]) || 0) ? z : b), (ex.zones || [])[0]);
+            const exStatus = (ex) => {
+                if (!session.painSet || !(ex.zones || []).length) return null;
+                const m = zoneMax(ex, session.pain); if (m < 3) return null;
+                const z = ZONE[worstZone(ex, session.pain)]?.short || '';
+                if (m >= 5) return { lvl: 'red', txt: `${z} ${m}/10 → hoy sáltalo.` };
+                return { lvl: 'amber', txt: `${z} ${m}/10 → ${ex.alt || 'baja un 20-30% la carga y recorta el recorrido.'}` };
+            };
+            /* ---- Doble progresión conservadora: subir solo con el tope de reps en todas las series y 0/10 ---- */
+            const progress = (ex) => {
+                if (ex.kind !== 'weighted' || !Array.isArray(ex.range)) return null;
+                const h = history.filter(x => x.date < date).find(x => (x.exercises || []).some(e => e.name === ex.name));
+                if (!h) return null;
+                const prev = h.exercises.find(e => e.name === ex.name);
+                const work = (prev.sets || []).filter(s => !isWarmSet(s) && (s.r !== '' || s.w !== ''));
+                if (!work.length) return null;
+                const hi = ex.range[1];
+                const hit = work.every(s => (parseInt(s.r) || 0) >= hi);
+                if (!hit) return { up: false, txt: `Mantén el peso hasta hacer ${hi} reps en todas las series.` };
+                const painPrev = zoneMax(ex, h.pain);
+                if (painPrev > 0) return { up: false, txt: `Llegaste a ${hi} reps, pero hubo molestia (${painPrev}/10). Mantén el peso.` };
+                if (!session.painSet) return { up: false, txt: `Llegaste a ${hi} reps. Rellena el semáforo de hoy para saber si toca subir.` };
+                const painNow = zoneMax(ex, session.pain);
+                if (painNow > 0) return { up: false, txt: `Llegaste a ${hi} reps, pero hoy hay molestia (${painNow}/10). Mantén el peso.` };
+                const w = Math.max(...work.map(s => parseFloat(s.w) || 0));
+                const n = (v) => String(v).replace('.', ',');
+                return { up: true, txt: `Toca subir: ${w ? `${n(w)} → ${n(Math.round((w + (ex.inc || 2.5)) * 2) / 2)} kg` : `+${n(ex.inc || 2.5)} kg`} (tope de reps y 0/10 durante y después).` };
+            };
+            const okName = (name) => { const why = blacklisted(name); return !why || confirm(`"${name}" está en tu lista negra (${why}). ¿Añadirlo igualmente?`); };
+
             const save = () => {
-                const entry = { id: Date.now(), date, dayType, bw: profile.bw, pain: { ...session.pain }, notes: session.notes, exercises: JSON.parse(JSON.stringify(session.exercises)) };
+                const entry = { id: Date.now(), date, dayType, bw: profile.bw, pain: { ...session.pain }, painSet: session.painSet, notes: session.notes, exercises: JSON.parse(JSON.stringify(session.exercises)) };
                 setHistory(h => [entry, ...h.filter(x => x.date !== date)].sort((a, b) => new Date(b.date) - new Date(a.date)));
                 ping('Sesión guardada');
             };
@@ -418,15 +672,15 @@
             const delExAt = (i) => setSession(s => ({ ...s, exercises: s.exercises.filter((_, k) => k !== i) }));
             const pushEx = (b) => setSession(s => ({ ...s, exercises: [...s.exercises, JSON.parse(JSON.stringify(b))] }));
             const addEx = () => {
-                if (!newEx.name.trim()) return;
-                const b = { name: newEx.name.trim(), kind: newEx.kind };
+                if (!newEx.name.trim() || !okName(newEx.name.trim())) return;
+                const b = { name: newEx.name.trim(), kind: newEx.kind, block: newEx.kind === 'cardio' ? 'cardio' : 'main', rest: newEx.kind === 'cardio' || newEx.kind === 'checklist' ? undefined : 90 };
                 if (newEx.kind === 'checklist') b.done = false;
                 else if (newEx.kind === 'timer') b.sets = [{ sec: 60, done: false }];
-                else if (newEx.kind === 'cardio') b.cardio = { method: 'walk', km: '', time: '', ppm: '', rounds: '' };
+                else if (newEx.kind === 'cardio') b.cardio = { method: 'treadmill', km: '', time: '', ppm: '', rounds: '' };
                 else b.sets = [{ w: '', r: '' }];
                 pushEx(b); setNewEx({ name: '', kind: 'weighted' }); setAdding(false);
             };
-            const addCardio = (m) => { pushEx({ name: 'Cardio', kind: 'cardio', cardio: { method: m, km: '', time: '', ppm: '', rounds: '' } }); setCardioOpen(false); };
+            const addCardio = (m) => { pushEx({ name: 'Cardio', kind: 'cardio', block: 'cardio', target: '140-150 ppm', cue: CARDIO_CUE, cardio: { method: m, km: '', time: '', ppm: '', rounds: '' } }); setCardioOpen(false); };
 
             const saveWeight = () => {
                 if (!wForm.w) { ping('Pon al menos el peso'); return; }
@@ -472,12 +726,12 @@
                 <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">MOLDOVAN·POWER</div>
                 <div style="font-size:11px;color:#64748B;margin-bottom:18px;">Informe · ${todayStr()} · Racha actual ${streak} días</div>
                 <table style="${css}border-collapse:collapse;width:100%;font-size:12px;">
-                <tr style="background:#10B981;color:#fff;text-align:left;"><th style="padding:8px 10px;">Fecha</th><th style="padding:8px 10px;">Día</th><th style="padding:8px 10px;">P.Corp</th><th style="padding:8px 10px;">Ejercicio</th><th style="padding:8px 10px;">Serie</th><th style="padding:8px 10px;">Kg</th><th style="padding:8px 10px;">Dato</th><th style="padding:8px 10px;">Muñeca</th><th style="padding:8px 10px;">Rodilla</th><th style="padding:8px 10px;">Notas</th></tr>`;
+                <tr style="background:#10B981;color:#fff;text-align:left;"><th style="padding:8px 10px;">Fecha</th><th style="padding:8px 10px;">Día</th><th style="padding:8px 10px;">P.Corp</th><th style="padding:8px 10px;">Ejercicio</th><th style="padding:8px 10px;">Serie</th><th style="padding:8px 10px;">Kg</th><th style="padding:8px 10px;">Dato</th>${ZONES.map(z => `<th style="padding:8px 10px;">${z.short}</th>`).join('')}<th style="padding:8px 10px;">Notas</th></tr>`;
                 let alt = false;
                 data.forEach(h => {
                     const dd = DAYS[h.dayType] || DAYS.rest; const bg = (alt = !alt) ? '#121826' : '#0F1521';
                     const base = `<td style="padding:7px 10px;color:#94A3B8;">${h.date}</td><td style="padding:7px 10px;color:${dd.accent};font-weight:700;">${dd.label}</td><td style="padding:7px 10px;">${h.bw}</td>`;
-                    const tail = `<td style="padding:7px 10px;">${h.pain.wrist}</td><td style="padding:7px 10px;">${h.pain.knee}</td><td style="padding:7px 10px;color:#64748B;">${h.notes || ''}</td>`;
+                    const tail = `${ZONES.map(z => `<td style="padding:7px 10px;">${h.pain[z.k] ?? 0}</td>`).join('')}<td style="padding:7px 10px;color:#64748B;">${h.notes || ''}</td>`;
                     const row = (mid) => { html += `<tr style="background:${bg};">${base}${mid}${tail}</tr>`; };
                     if (!h.exercises || !h.exercises.length) { row(`<td colspan="4" style="padding:7px 10px;color:#475569;">—</td>`); return; }
                     h.exercises.forEach(e => {
@@ -505,8 +759,10 @@
                 const pts = [];
                 if (m.src === 'weight' || m.src === 'fat') {
                     [...weightLog].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(w => { const v = parseFloat(m.src === 'weight' ? w.w : w.fat); if (v > 0) pts.push({ v }); });
-                } else if (m.src === 'wrist' || m.src === 'knee') {
-                    [...history].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => { pts.push({ v: Number((h.pain || {})[m.src]) || 0 }); });
+                } else if (m.src === 'pain') {
+                    [...history].sort((a, b) => new Date(a.date) - new Date(b.date)).filter(h => h.painSet !== false).forEach(h => { pts.push({ v: Number((h.pain || {})[m.zone]) || 0 }); });
+                } else if (m.src === 'ppm') {
+                    [...history].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => { const v = (h.exercises || []).filter(e => e.kind === 'cardio').map(e => Number((e.cardio || {}).ppm) || 0).filter(n => n > 0); if (v.length) pts.push({ v: Math.max(...v) }); });
                 } else {
                     [...history].sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => {
                         const ex = (h.exercises || []).find(e => e.name === m.ex); if (!ex) return;
@@ -521,7 +777,7 @@
             /* ---------- HEADER ---------- */
             const Header = (
                 <div className="px-5 pt-[max(16px,var(--safe-t))] pb-3 flex items-center justify-between sticky top-0 z-20 bg-[#0B0F19]/85 backdrop-blur-xl">
-                    <div><h1 className="font-black text-xl tracking-tight leading-none">MOLDOVAN<span style={{ color: theme.accent }}>·POWER</span></h1><p className="text-[11px] text-slate-500 font-medium mt-1">Rehab · Barseagle × Uri</p></div>
+                    <div><h1 className="font-black text-xl tracking-tight leading-none">MOLDOVAN<span style={{ color: theme.accent }}>·POWER</span></h1><p className="text-[11px] text-slate-500 font-medium mt-1">Postura · Rehab · Gym</p></div>
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: streak > 0 ? '#F59E0B22' : '#1E293B' }}>
                             <span style={{ color: streak > 0 ? '#F59E0B' : '#475569' }}><Ic d={I.flame} s={16} /></span>
@@ -538,7 +794,7 @@
                 return (<>
                     {ex.sets.map((st, j) => (
                         <div key={j} className="flex gap-2 items-stretch">
-                            <div className="w-12 flex items-center justify-center text-[10px] font-black text-slate-500 text-center">{st.label || j + 1}</div>
+                            <div className="w-12 flex items-center justify-center text-[10px] font-black text-slate-500 text-center">{st.label || ex.sets.slice(0, j + 1).filter(x => !isWarmSet(x)).length}</div>
                             {showKg && (<div className="flex-1 bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06]"><label className="text-[9px] block text-slate-500 font-bold uppercase">Peso kg</label><input type="number" inputMode="decimal" placeholder="0" value={st.w} onChange={e => updEx(i, x => { x.sets[j].w = e.target.value; return x; })} className="bg-transparent w-full font-black text-base outline-none" /></div>)}
                             <div className="flex-1 bg-[#0B0F19] rounded-xl px-3 py-2 border border-white/[0.06]"><label className="text-[9px] block text-slate-500 font-bold uppercase">Reps</label><input type="number" inputMode="numeric" placeholder="0" value={st.r} onChange={e => updEx(i, x => { x.sets[j].r = e.target.value; return x; })} className="bg-transparent w-full font-black text-base outline-none" /></div>
                             {ex.sets.length > 1 && <button onClick={() => updEx(i, x => { x.sets.splice(j, 1); return x; })} className="w-7 flex items-center justify-center text-slate-700 tap"><Ic d={I.trash} s={15} /></button>}
@@ -549,25 +805,44 @@
                 </>);
             };
 
+            const LV = { red: { c: '#F43F5E', bg: '#F43F5E14', b: '#F43F5E44' }, amber: { c: '#F59E0B', bg: '#F59E0B14', b: '#F59E0B44' } };
             const ExerciseCard = (ex, i) => {
                 const last = lastPerf(ex.name);
-                return (<Card key={i} className="overflow-hidden fade-in">
-                    <div className="px-4 py-3 flex items-center justify-between border-b border-white/[0.06]" style={{ background: theme.accent + '12' }}>
-                        <div className="min-w-0 flex-1"><div className="font-bold text-sm" style={{ color: theme.accent }}>{ex.name}</div>{last && <div className="text-[10px] text-slate-500 mt-0.5 whitespace-pre-line leading-snug">{last}</div>}</div>
-                        <div className="flex items-center gap-3 shrink-0 ml-2">{dayType === 'light' && ex.kind !== 'cardio' && <button onClick={() => { setRestAt(i); setRestNonce(n => n + 1); }} className="tap flex items-center gap-1 text-[11px] font-black px-2 py-1 rounded-lg" style={{ color: theme.accent, background: theme.accent + '1F' }}><Ic d={I.clock} s={15} /> 90s</button>}{ex.video && <a href={ex.video} target="_blank" rel="noreferrer" className="text-slate-400 tap"><Ic d={I.play} s={20} /></a>}<button onClick={() => delExAt(i)} className="text-slate-600 tap"><Ic d={I.trash} s={17} /></button></div>
+                const st = exStatus(ex);
+                const pr = progress(ex);
+                const restSec = ex.rest || (dayType === 'light' && ex.kind !== 'cardio' ? 90 : 0);
+                const ac = theme.accent;
+                return (<Card key={i} className="overflow-hidden fade-in" >
+                    <div className="px-4 py-3 flex items-start justify-between border-b border-white/[0.06]" style={{ background: (st?.lvl === 'red' ? '#F43F5E' : ac) + '12' }}>
+                        <div className="min-w-0 flex-1">
+                            <div className="font-bold text-sm leading-snug" style={{ color: st?.lvl === 'red' ? '#FDA4AF' : ac }}>{ex.name}</div>
+                            {ex.target && <div className="text-[11px] font-bold text-slate-300 mt-0.5">{ex.target}</div>}
+                            {last && <div className="text-[10px] text-slate-500 mt-1 whitespace-pre-line leading-snug">{last}</div>}
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0 ml-2 pt-0.5">
+                            {restSec > 0 && <button onClick={() => { setRestAt(i); setRestNonce(n => n + 1); }} className="tap flex items-center gap-1 text-[11px] font-black px-2 py-1 rounded-lg" style={{ color: ac, background: ac + '1F' }} aria-label={`Descanso ${restSec} segundos`}><Ic d={I.clock} s={15} /> {fmt(restSec)}</button>}
+                            {ex.video && <a href={ex.video} target="_blank" rel="noreferrer" className="tap flex items-center gap-1 text-[11px] font-black px-2 py-1 rounded-lg text-slate-200 bg-white/[0.06]" aria-label="Ver vídeo"><Ic d={I.play} s={15} /> Vídeo</a>}
+                            <button onClick={() => delExAt(i)} className="text-slate-600 tap" aria-label="Quitar ejercicio"><Ic d={I.trash} s={16} /></button>
+                        </div>
                     </div>
-                    {ex.kind === 'cardio' ? <CardioBlock ex={ex} accent={theme.accent} onChange={u => updEx(i, () => u)} /> : (
+                    <div className="px-4 pt-3 space-y-2">
+                        {ex.cue && <p className="text-[11.5px] leading-relaxed text-slate-300 rounded-xl p-2.5 border-l-2" style={{ background: ac + '0D', borderColor: ac }}>{ex.cue}</p>}
+                        {ex.cond && <p className="text-[11px] leading-relaxed text-amber-200/90 bg-amber-500/[0.07] rounded-xl p-2.5">{ex.cond}</p>}
+                        {st && <p className="text-[11px] font-bold leading-relaxed rounded-xl p-2.5 border" style={{ color: LV[st.lvl].c, background: LV[st.lvl].bg, borderColor: LV[st.lvl].b }}>{st.lvl === 'red' ? 'Semáforo rojo · ' : 'Modo protección · '}{st.txt}</p>}
+                        {pr && <p className="text-[11px] font-bold leading-relaxed rounded-xl p-2.5" style={pr.up ? { color: '#6EE7B7', background: '#10B98118' } : { color: '#94A3B8', background: '#ffffff08' }}>{pr.up ? '▲ ' : '= '}{pr.txt}</p>}
+                        {ex.note && <p className="text-[11px] leading-relaxed text-slate-400 bg-white/[0.03] rounded-xl p-2.5">{ex.note}</p>}
+                    </div>
+                    {ex.kind === 'cardio' ? <CardioBlock ex={ex} accent={ac} onChange={u => updEx(i, () => u)} /> : (
                         <div className="p-4 space-y-3">
-                            {ex.note && <p className="text-[11px] leading-relaxed text-slate-400 bg-white/[0.03] rounded-xl p-2.5">{ex.note}</p>}
-                            {ex.kind === 'checklist' && <button onClick={() => updEx(i, e => ({ ...e, done: !e.done }))} className="w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 tap border" style={ex.done ? { background: theme.accent, borderColor: theme.accent, color: '#fff' } : { borderColor: '#ffffff18', color: '#94a3b8' }}><Ic d={I.check} s={18} /> {ex.done ? 'Completado' : 'Marcar como hecho'}</button>}
+                            {ex.kind === 'checklist' && <button onClick={() => updEx(i, e => ({ ...e, done: !e.done }))} className="w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 tap border" style={ex.done ? { background: ac, borderColor: ac, color: '#fff' } : { borderColor: '#ffffff18', color: '#94a3b8' }}><Ic d={I.check} s={18} /> {ex.done ? 'Completado' : 'Marcar como hecho'}</button>}
                             {ex.kind === 'timer' && (<>
-                                {ex.sets.map((st, j) => <TimerSet key={j} st={st} halfBeep={ex.halfBeep} accent={theme.accent} canDel={ex.sets.length > 1} onDel={() => updEx(i, x => { x.sets.splice(j, 1); return x; })} onChange={u => updEx(i, x => { x.sets[j] = u; return x; })} />)}
+                                {ex.sets.map((st2, j) => <TimerSet key={j} st={st2} halfBeep={ex.halfBeep} accent={ac} canDel={ex.sets.length > 1} onDel={() => updEx(i, x => { x.sets.splice(j, 1); return x; })} onChange={u => updEx(i, x => { x.sets[j] = u; return x; })} />)}
                                 <button onClick={() => updEx(i, x => { x.sets.push({ sec: x.sets.at(-1)?.sec || 60, done: false }); return x; })} className="w-full py-2.5 border border-dashed border-white/10 rounded-xl text-xs font-bold text-slate-500 flex items-center justify-center gap-1 tap"><Ic d={I.plus} s={14} /> Añadir serie</button>
                             </>)}
                             {(ex.kind === 'weighted' || ex.kind === 'reps') && SetRows(ex, i)}
                         </div>
                     )}
-                    {dayType === 'light' && restAt === i && <div className="px-4 pb-4"><RestTimer key={restNonce} accent={theme.accent} seconds={90} onClose={() => setRestAt(null)} /></div>}
+                    {restSec > 0 && restAt === i && <div className="px-4 pb-4"><RestTimer key={restNonce} accent={ac} seconds={restSec} onClose={() => setRestAt(null)} /></div>}
                 </Card>);
             };
 
@@ -606,30 +881,52 @@
                                     </div>
                                 )}
                                 <Card className="p-2 flex items-center gap-2">
-                                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent flex-1 font-bold px-2 outline-none" />
-                                    <select value={dayType} onChange={e => changeDay(e.target.value)} className="bg-transparent font-black uppercase text-sm text-right outline-none px-2" style={{ color: theme.accent }}>{ORDER.map(k => <option key={k} value={k}>{DAYS[k].label}</option>)}</select>
+                                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent flex-1 min-w-0 font-bold px-2 outline-none" />
+                                    <select value={dayType} onChange={e => changeDay(e.target.value)} className="bg-transparent font-black text-[13px] text-right outline-none px-2 max-w-[58%]" style={{ color: theme.accent }}>{(ORDER.includes(dayType) ? ORDER : [...ORDER, dayType]).map(k => <option key={k} value={k}>{(DAYS[k] || DAYS.rest).label}</option>)}</select>
                                 </Card>
-                                <div className="flex items-center gap-2 px-1"><div className="h-2 w-2 rounded-full" style={{ background: theme.accent }} /><span className="text-xs font-semibold text-slate-400">{theme.sub}</span></div>
+                                <div className="flex items-center gap-2 px-1"><div className="h-2 w-2 rounded-full shrink-0" style={{ background: theme.accent }} /><span className="text-xs font-semibold text-slate-400">{theme.sub}</span></div>
 
-                                {dayType === 'pull' && (
-                                    <Card className="p-4 space-y-3">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Estrategia 2-set · 1RM +{profile.oneRM}kg</span>
-                                        <div className="text-[9px] font-bold uppercase tracking-widest text-slate-600 px-1">Calentamiento</div>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 1 · 5</div><div className="font-black">Sin peso</div></div>
-                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 2 · 3</div><div className="font-black">+{strat.cal2}kg</div></div>
-                                            <div className="bg-[#0B0F19] rounded-xl p-2.5 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">Cal. 3 · 1-2</div><div className="font-black">+{strat.cal3}kg</div></div>
-                                        </div>
-                                        <div className="text-[9px] font-bold uppercase tracking-widest text-slate-600 px-1">Trabajo</div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="rounded-xl p-2.5 text-center" style={{ background: theme.accent + '22' }}><div className="text-[9px] font-bold uppercase" style={{ color: theme.accent }}>Serie 1 · 6-10</div><div className="font-black" style={{ color: theme.accent }}>+{strat.s1}kg</div></div>
-                                            <div className="rounded-xl p-2.5 text-center" style={{ background: theme.accent + '22' }}><div className="text-[9px] font-bold uppercase" style={{ color: theme.accent }}>Serie 2 · 10-15</div><div className="font-black" style={{ color: theme.accent }}>+{strat.s2}kg</div></div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500">Cal. al % del 1RM (60% / 80%). S1 al fallo técnico. Sube el 1RM en Ajustes y se recalcula.</p>
-                                    </Card>
-                                )}
+                                {(() => {
+                                    const vals = ZONES.map(z => session.pain[z.k] || 0); const mx = Math.max(...vals);
+                                    const lvl = !session.painSet ? null : mx >= 5 ? 'red' : mx >= 3 ? 'amber' : 'green';
+                                    const col = { red: '#F43F5E', amber: '#F59E0B', green: '#10B981' }[lvl] || '#64748B';
+                                    const affected = session.painSet ? session.exercises.filter(e => exStatus(e)).length : 0;
+                                    const open = painOpen || !session.painSet;
+                                    const setZ = (k, v) => { setPainOpen(true); setSession(s => ({ ...s, painSet: true, pain: { ...s.pain, [k]: v } })); };
+                                    return (<Card className="overflow-hidden">
+                                        <button onClick={() => setPainOpen(o => !o)} className="w-full px-4 py-3 flex items-center justify-between tap" style={{ background: col + '14' }}>
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <span className="w-3 h-3 rounded-full shrink-0" style={{ background: col, boxShadow: `0 0 10px ${col}` }} />
+                                                <div className="text-left min-w-0">
+                                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Semáforo de hoy</div>
+                                                    <div className="text-xs font-bold truncate" style={{ color: lvl ? col : '#94A3B8' }}>{!lvl ? 'Antes de entrenar: ¿cómo están tus zonas?' : lvl === 'green' ? 'Todo en verde · entreno normal' : `${ZONES.filter(z => (session.pain[z.k] || 0) >= 3).map(z => `${z.short} ${session.pain[z.k]}`).join(' · ')} · ${affected} ejercicio${affected === 1 ? '' : 's'} adaptado${affected === 1 ? '' : 's'}`}</div>
+                                                </div>
+                                            </div>
+                                            <span className="text-slate-500 shrink-0" style={{ transform: open ? 'rotate(90deg)' : 'none', transition: '.2s' }}><Ic d={I.chev} s={18} /></span>
+                                        </button>
+                                        {open && <div className="p-4 space-y-4 fade-in">
+                                            {ZONES.map(z => <PainSlider key={z.k} label={z.label} value={session.pain[z.k] || 0} onChange={v => setZ(z.k, v)} />)}
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setSession(s => ({ ...s, painSet: true, pain: emptyPain() })); setPainOpen(false); }} className="flex-1 py-2.5 rounded-xl text-xs font-black tap border border-emerald-500/30 text-emerald-300">Todo a 0</button>
+                                                <button onClick={() => { setSession(s => ({ ...s, painSet: true })); setPainOpen(false); }} className="flex-1 py-2.5 rounded-xl text-xs font-black tap text-white" style={{ background: theme.accent }}>Listo</button>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 leading-relaxed">0-2 verde: entreno normal · 3-4 ámbar: modo protección en los ejercicios que cargan esa zona · 5+ rojo: sáltalos y coméntalo con el fisio. Pon también cómo amaneció la rodilla: el dolor sinovial aparece 24-48 h después.</p>
+                                        </div>}
+                                    </Card>);
+                                })()}
 
-                                {session.exercises.map((ex, i) => ExerciseCard(ex, i))}
+                                {BLOCK_ORDER.map(bk => {
+                                    const items = session.exercises.map((ex, i) => [ex, i]).filter(([ex]) => (BLOCKS[ex.block] ? ex.block : 'main') === bk);
+                                    if (!items.length) return null;
+                                    const done = items.filter(([ex]) => ex.kind === 'checklist' ? ex.done : ex.kind === 'timer' ? (ex.sets || []).every(s => s.done) : ex.kind === 'cardio' ? !!(ex.cardio && (ex.cardio.time || ex.cardio.km)) : (ex.sets || []).some(s => s.r !== '' && !isWarmSet(s))).length;
+                                    return (<div key={bk} className="space-y-3">
+                                        <div className="flex items-baseline justify-between px-1 pt-2">
+                                            <h3 className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: theme.accent }}>{BLOCKS[bk]}</h3>
+                                            <span className="text-[10px] font-bold text-slate-500 tabular-nums">{done}/{items.length}</span>
+                                        </div>
+                                        {items.map(([ex, i]) => ExerciseCard(ex, i))}
+                                    </div>);
+                                })}
 
                                 {(SUGGEST[dayType] || []).length > 0 && (
                                     <div className="flex flex-wrap gap-2">{SUGGEST[dayType].map(s => <button key={s.name} onClick={() => pushEx(s)} className="px-3 py-2 rounded-xl text-[11px] font-bold border border-white/10 text-slate-300 tap flex items-center gap-1"><Ic d={I.plus} s={13} /> {s.name}</button>)}</div>
@@ -645,14 +942,12 @@
 
                                 <Card className="overflow-hidden">
                                     <button onClick={() => setCardioOpen(o => !o)} className="w-full px-4 py-3 flex items-center justify-between tap"><span className="font-bold text-sm flex items-center gap-2 text-slate-300"><Ic d={I.heart} s={16} /> Añadir cardio</span><span className="text-slate-500" style={{ transform: cardioOpen ? 'rotate(90deg)' : 'none', transition: '.2s' }}><Ic d={I.chev} s={18} /></span></button>
-                                    {cardioOpen && <div className="px-4 pb-4 grid grid-cols-2 gap-2 fade-in">{Object.keys(CARDIO_METHODS).map(m => <button key={m} onClick={() => addCardio(m)} className="py-3 rounded-xl text-xs font-bold border border-white/10 text-slate-300 tap">{CARDIO_METHODS[m]}</button>)}</div>}
+                                    {cardioOpen && <div className="px-4 pb-4 grid grid-cols-2 gap-2 fade-in">{CARDIO_OFFER.map(m => <button key={m} onClick={() => addCardio(m)} className="py-3 rounded-xl text-xs font-bold border border-white/10 text-slate-300 tap">{CARDIO_METHODS[m]}</button>)}</div>}
                                 </Card>
 
-                                <Card className="p-4 space-y-5">
-                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Dolor articular</h3>
-                                    <PainSlider label="Muñeca derecha" value={session.pain.wrist} onChange={v => setSession(s => ({ ...s, pain: { ...s.pain, wrist: v } }))} />
-                                    <PainSlider label="Rodilla izquierda" value={session.pain.knee} onChange={v => setSession(s => ({ ...s, pain: { ...s.pain, knee: v } }))} />
-                                    <textarea placeholder="Notas, sensaciones, molestias…" value={session.notes} onChange={e => setSession(s => ({ ...s, notes: e.target.value }))} className="w-full bg-[#0B0F19] border border-white/[0.06] rounded-xl p-3 text-sm outline-none h-24 resize-none" />
+                                <Card className="p-4 space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Notas</h3>
+                                    <textarea placeholder="Sensaciones, molestias durante el entreno, máquina usada…" value={session.notes} onChange={e => setSession(s => ({ ...s, notes: e.target.value }))} className="w-full bg-[#0B0F19] border border-white/[0.06] rounded-xl p-3 text-sm outline-none h-24 resize-none" />
                                 </Card>
 
                                 <button onClick={save} className="w-full py-5 rounded-2xl font-black text-base text-white flex items-center justify-center gap-2 tap" style={{ background: theme.accent, boxShadow: `0 10px 30px -10px ${theme.accent}` }}><Ic d={I.save} /> GUARDAR SESIÓN</button>
@@ -662,9 +957,9 @@
                                         if (!confirm('¿Borrar la sesión guardada de este día?')) return;
                                         const newHist = history.filter(x => x.id !== entry.id);
                                         setHistory(newHist);
-                                        const sg = newHist.length ? ORDER[(ORDER.indexOf(newHist[0].dayType) + 1) % ORDER.length] : ORDER[0];
+                                        const sg = newHist.length ? nextAfter(newHist[0].dayType) : ORDER[0];
                                         const ls = newHist.find(x => x.dayType === sg);
-                                        setSession({ dayType: sg, pain: { wrist: 0, knee: 0 }, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null, baseFor(sg)) });
+                                        setSession({ dayType: sg, pain: emptyPain(), painSet: false, notes: '', exercises: seed(sg, profile.oneRM, ls ? ls.exercises : null, baseFor(sg)) });
                                         ping('Sesión borrada');
                                     }} className="w-full py-3 rounded-2xl font-bold text-xs text-rose-400/80 flex items-center justify-center gap-2 tap border border-rose-500/20"><Ic d={I.trash} s={14} /> Borrar sesión guardada</button>
                                 )}
@@ -738,7 +1033,7 @@
                                                 className="rounded-2xl p-4 flex items-center justify-between tap border" style={h ? { background: dd.accent + '1F', borderColor: dd.accent + '55' } : { background: '#121826', borderColor: isToday ? '#ffffff22' : 'transparent' }}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 text-center"><div className="text-[10px] uppercase font-bold text-slate-500">{wd}</div><div className="font-black text-lg" style={h ? { color: dd.accent } : { color: '#475569' }}>{new Date(ds).getDate()}</div></div>
-                                                    <div>{h ? (<><div className="font-bold text-sm" style={{ color: dd.accent }}>{dd.label}</div><div className="text-[10px] text-slate-500 font-bold">{(h.exercises || []).length} ej{(h.pain.wrist || h.pain.knee) ? ` · ✋${h.pain.wrist} 🦵${h.pain.knee}` : ''}{w ? ` · ${w.w}kg` : ''}</div></>) : (<div className="text-xs font-bold text-slate-600">{w ? `${w.w} kg registrado` : (isToday ? 'Hoy — sin registrar' : 'Sin entreno')}</div>)}</div>
+                                                    <div>{h ? (<><div className="font-bold text-sm" style={{ color: dd.accent }}>{dd.label}</div><div className="text-[10px] text-slate-500 font-bold">{(h.exercises || []).length} ej{(() => { const z = ZONES.reduce((b, x) => ((h.pain[x.k] || 0) > (h.pain[b.k] || 0) ? x : b), ZONES[0]); const v = h.pain[z.k] || 0; return v ? ` · ${z.short} ${v}/10` : ''; })()}{w ? ` · ${w.w}kg` : ''}</div></>) : (<div className="text-xs font-bold text-slate-600">{w ? `${w.w} kg registrado` : (isToday ? 'Hoy — sin registrar' : 'Sin entreno')}</div>)}</div>
                                                 </div>
                                                 <Ic d={I.chev} s={16} c="#475569" />
                                             </div>);
@@ -772,16 +1067,40 @@
                             </div>
                         )}
 
+                        {tab === 'guide' && (
+                            <div className="space-y-4 pt-2">
+                                <h2 className="text-2xl font-black px-1">Guía</h2>
+                                <Card className="p-5 space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cómo progresar</h3>
+                                    <p className="text-[12px] text-slate-300 leading-relaxed">Doble progresión conservadora: solo subes peso cuando haces el tope de reps en <b>todas</b> las series, con el tempo y las pausas, y con <b>0/10</b> durante la sesión y a las 24-48 h en esternón, costado, hombro, ingle y rodilla. La app te lo indica en cada ejercicio.</p>
+                                    <p className="text-[12px] text-slate-300 leading-relaxed">Entreno submáximo: sin fallo y sin aguantar la respiración. 3-4 ejercicios principales por día; el resto es complemento.</p>
+                                </Card>
+                                <Card className="p-5 space-y-2.5">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-rose-400">Lista negra</h3>
+                                    {['Fondos en paralelas (con o sin lastre) y dominadas lastradas.', 'Pec deck y cualquier apertura con máquina o mancuernas.', 'Deltoides posterior en máquina aplastando el pecho contra el cojín.', 'Crunches en suelo, máquina o polea (tiran del esternón y las costillas 5ª-7ª).', 'Planchas boca abajo mientras moleste el costado o el serrato.', 'Sentadilla libre con barra y peso muerto convencional o rumano pesado.', 'Sprints o HIIT (más de 170 ppm) mientras haya inflamación en el esternón o entre las costillas.'].map((t, k) => <div key={k} className="flex gap-2.5 text-[12px] text-slate-300 leading-snug"><span className="text-rose-400 font-black shrink-0">✕</span>{t}</div>)}
+                                    <p className="text-[10px] text-slate-500 pt-1">Si añades un ejercicio que suena a alguno de estos, la app te avisa antes.</p>
+                                </Card>
+                                <Card className="p-5 space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cada día, fuera del gimnasio</h3>
+                                    {[['Escritorio', 'No apoyes el peso del tronco en el codo izquierdo ni las costillas contra el borde de la mesa.'], ['Dormir de lado', 'Almohada firme entre rodillas y tobillos, para que la pierna de arriba no caiga y gire hacia dentro.'], ['Dormir boca arriba', 'Cojín bajo las rodillas (unos 10° de flexión).'], ['De pie con carga', 'Rodillas siempre con 5° de flexión. Nunca bloqueadas hacia atrás.']].map(([t, d]) => <div key={t}><div className="text-[12px] font-black text-slate-200">{t}</div><div className="text-[12px] text-slate-400 leading-snug">{d}</div></div>)}
+                                </Card>
+                                {LIBRARY.map(g => (
+                                    <Card key={g.title} className="p-5 space-y-1">
+                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 pb-1">{g.title}</h3>
+                                        {g.items.map(([t, u]) => <a key={u} href={u} target="_blank" rel="noreferrer" className="flex items-center gap-3 py-2 tap border-b border-white/[0.04] last:border-0"><span className="shrink-0" style={{ color: theme.accent }}><Ic d={I.play} s={18} /></span><span className="text-[12px] font-semibold text-slate-300 leading-snug">{t}</span></a>)}
+                                    </Card>
+                                ))}
+                                <p className="text-center text-[10px] text-slate-600 px-4">Basado en tu informe técnico-clínico. No sustituye al fisio ni al traumatólogo: si una zona pasa de 5/10, para y consúltalo.</p>
+                            </div>
+                        )}
+
                         {tab === 'conf' && (
                             <div className="space-y-4 pt-2">
                                 <h2 className="text-2xl font-black px-1">Ajustes</h2>
                                 <Card className="p-5 space-y-4">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Perfil</h3>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">Peso corporal (kg)</label><input type="number" inputMode="decimal" value={profile.bw} onChange={e => setProfile(p => ({ ...p, bw: e.target.value }))} className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06] w-full font-black mt-1" /></div>
-                                        <div><label className="text-[10px] font-bold text-slate-500 uppercase">1RM dominada (kg lastre)</label><input type="number" inputMode="decimal" value={profile.oneRM} onChange={e => setProfile(p => ({ ...p, oneRM: e.target.value }))} className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06] w-full font-black mt-1" /></div>
-                                    </div>
-                                    <p className="text-[10px] text-slate-500">Estrategia 2-set: Cal.1 sin peso 5r · Cal.2 60% 3r · Cal.3 80% 1-2r · S1 75% · S2 60%. “Toca” avanza al siguiente día tras el último guardado.</p>
+                                    <div><label className="text-[10px] font-bold text-slate-500 uppercase">Peso corporal (kg)</label><input type="number" inputMode="decimal" value={profile.bw} onChange={e => setProfile(p => ({ ...p, bw: e.target.value }))} className="bg-[#0B0F19] rounded-xl p-3 border border-white/[0.06] w-full font-black mt-1" /></div>
+                                    <p className="text-[10px] text-slate-500">Programa: Espalda → Cuádriceps → Pecho → Femoral → Hombro → Postura → Descanso. “Toca” pasa al siguiente día después del último que guardaste, sin mirar la fecha.</p>
                                 </Card>
 
                                 <Card className="p-5 space-y-3">
@@ -807,8 +1126,13 @@
                                                 </div>
                                                 <div className="flex gap-2">
                                                     <select value={e.kind} onChange={ev => editKind(k, ev.target.value)} className="bg-[#121826] rounded-lg px-2 py-2 text-xs font-bold outline-none border border-white/[0.06]">{Object.keys(KINDS).map(kk => <option key={kk} value={kk}>{KINDS[kk]}</option>)}</select>
-                                                    <input value={e.video || ''} onChange={ev => editUpd(k, x => ({ ...x, video: ev.target.value }))} placeholder="URL vídeo (opcional)" className="flex-1 bg-[#121826] rounded-lg px-3 py-2 text-xs outline-none border border-white/[0.06]" />
+                                                    <input value={e.video || ''} onChange={ev => editUpd(k, x => ({ ...x, video: ev.target.value }))} placeholder="URL vídeo (opcional)" className="flex-1 min-w-0 bg-[#121826] rounded-lg px-3 py-2 text-xs outline-none border border-white/[0.06]" />
                                                 </div>
+                                                <div className="flex gap-2">
+                                                    <select value={BLOCKS[e.block] ? e.block : 'main'} onChange={ev => editUpd(k, x => ({ ...x, block: ev.target.value }))} className="bg-[#121826] rounded-lg px-2 py-2 text-xs font-bold outline-none border border-white/[0.06]">{BLOCK_ORDER.map(b => <option key={b} value={b}>{BLOCKS[b]}</option>)}</select>
+                                                    <input value={e.target || ''} onChange={ev => editUpd(k, x => ({ ...x, target: ev.target.value }))} placeholder="Objetivo (ej. 3 × 10-12)" className="flex-1 min-w-0 bg-[#121826] rounded-lg px-3 py-2 text-xs outline-none border border-white/[0.06]" />
+                                                </div>
+                                                <textarea value={e.cue || ''} onChange={ev => editUpd(k, x => ({ ...x, cue: ev.target.value }))} placeholder="Recordatorio técnico" className="w-full bg-[#121826] rounded-lg px-3 py-2 text-xs outline-none border border-white/[0.06] h-16 resize-none" />
                                             </div>
                                         ))}
                                         <button onClick={editAdd} className="w-full py-2.5 border border-dashed border-white/10 rounded-xl text-xs font-bold text-slate-500 flex items-center justify-center gap-1 tap"><Ic d={I.plus} s={14} /> Añadir ejercicio</button>
@@ -845,7 +1169,7 @@
 
                     <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto z-30">
                         <div className="bg-[#121826]/90 backdrop-blur-xl border-t border-white/[0.06] flex px-1 pb-[max(10px,var(--safe-b))] pt-2">
-                            {[['today', I.today, 'Hoy'], ['weight', I.scale, 'Peso'], ['stats', I.chart, 'Progreso'], ['diary', I.diary, 'Diario'], ['conf', I.cog, 'Ajustes']].map(([k, ic, lb]) => (
+                            {[['today', I.today, 'Hoy'], ['weight', I.scale, 'Peso'], ['stats', I.chart, 'Progreso'], ['diary', I.diary, 'Diario'], ['guide', I.book, 'Guía'], ['conf', I.cog, 'Ajustes']].map(([k, ic, lb]) => (
                                 <button key={k} onClick={() => setTab(k)} className="flex-1 flex flex-col items-center gap-1 py-1.5 tap" style={{ color: tab === k ? theme.accent : '#475569' }}><Ic d={ic} s={21} /><span className="text-[10px] font-bold">{lb}</span></button>
                             ))}
                         </div>
